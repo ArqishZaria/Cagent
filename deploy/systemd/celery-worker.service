@@ -1,0 +1,22 @@
+[Unit]
+Description=Celery Worker — VoIP SaaS
+After=network.target redis-server.service postgresql.service
+Wants=redis-server.service postgresql.service
+
+[Service]
+Type=simple
+User=voipapp
+Group=voipapp
+WorkingDirectory=/opt/voip-saas/backend
+EnvironmentFile=/opt/voip-saas/backend/.env
+ExecStart=/opt/voip-saas/venv/bin/celery -A config worker \
+    --loglevel=info \
+    --logfile=/var/log/voip-saas/celery-worker.log \
+    --concurrency=2
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

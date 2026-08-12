@@ -1,0 +1,145 @@
+import { useEffect, useRef, useState } from "react";
+import { Ban, DollarSign, Send } from "lucide-react";
+import api from "../lib/api";
+
+const STATUS_COLORS = {
+  NEW: "bg-signal/15 text-signal-bright border-signal/30",
+  CONTACTED: "bg-amber/15 text-amber border-amber/30",
+  QUALIFIED: "bg-live/15 text-live border-live/30",
+  WON: "bg-live/20 text-live border-live/40",
+  LOST: "bg-ink-500/20 text-ink-200 border-ink-500/40",
+};
+
+/**
+ * LeadChatPanel — left side of the CRM/Dialer view: lead profile up top,
+ * continuous 2-way SMS thread below. The SMS input is hard-hidden (not just
+ * disabled) whenever lead.do_not_contact is true, mirroring the backend's
+ * own hard-block in telephony.views.SMSSendView — the UI shouldn't invite an
+ * action the server will reject anyway.
+ */
+export default function LeadChatPanel({ lead, fromNumber }) {
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!lead) return;
+    api
+      .get("/api/interactions/", { params: { lead: lead.id, type: "SMS" } })
+      .then((res) => setMessages(res.data?.results || res.data || []))
+      .catch(() => setMessages([]));
+  }, [lead?.id]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  if (!lead) {
+    return (
+      <div className="card h-full flex items-center justify-center text-sm text-ink-300">
+        Select a lead to view their profile and conversation.
+      </div>
+    );
+  }
+
+  const send = async () => {
+    const text = draft.trim();
+    if (!text || lead.do_not_contact) return;
+    setSending(true);
+    setError("");
+    try {
+      await api.post("/api/telephony/sms/send/", {
+        lead_id: lead.id,
+        from_number: fromNumber,
+        message: text,
+      });
+      setMessages((prev) => [
+        ...prev,
+        { id: `local-${Date.now()}`, direction: "OUTBOUND", message_body: text, timestamp: new Date().toISOString() },
+      ]);
+      setDraft("");
+    } catch (err) {
+      setError(err.response?.data?.detail || "Message couldn't be sent.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="card h-full flex flex-col overflow-hidden">
+      {/* Lead profile */}
+      <div className="p-5 border-b border-ink-500/50">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h2 className="font-display font-semibold text-lg">
+              {lead.first_name} {lead.last_name}
+            </h2>
+            <p className="text-xs text-ink-300">
+              {lead.job_title ? `${lead.job_title} · ` : ""}
+              {lead.company}
+            </p>
+          </div>
+          <span className={`text-[11px] font-mono px-2 py-1 rounded-full border ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
+            {lead.status}
+          </span>
+        </div>
+        <div className="flex items-center gap-4 text-xs">
+          <span className="font-mono text-ink-100">{lead.phone_number}</span>
+          {lead.deal_value && (
+            <span className="flex items-center gap-1 font-mono text-amber">
+              <DollarSign size={12} />
+              {Number(lead.deal_value).toLocaleString()}
+            </span>
+          )}
+          {lead.do_not_contact && (
+            <span className="flex items-center gap-1 text-alert">
+              <Ban size={12} /> Opted out
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* SMS thread */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3">
+        {messages.length === 0 && <p className="text-xs text-ink-300">No messages yet.</p>}
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+              m.direction === "OUTBOUND" ? "bg-signal text-white ml-auto" : "bg-ink-600 text-ink-50 mr-auto"
+            }`}
+          >
+            {m.message_body}
+          </div>
+        ))}
+      </div>
+
+      {/* Conditional send box — hidden entirely, not just disabled, when opted out */}
+      {lead.do_not_contact ? (
+        <div className="flex items-center gap-2 px-5 py-4 border-t border-ink-500/50 bg-alert/5 text-xs text-alert">
+          <Ban size={14} />
+          This lead replied STOP and can no longer be texted.
+        </div>
+      ) : (
+        <div className="p-4 border-t border-ink-500/50">
+          {error && <p className="text-xs text-alert mb-2">{error}</p>}
+          <div className="flex items-center gap-2">
+            <input
+              className="input-field flex-1 !text-sm"
+              placeholder="Send a text…"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && send()}
+              disabled={sending}
+            />
+            <button onClick={send} disabled={sending || !draft.trim()} className="btn-primary !p-2.5">
+              <Send size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
