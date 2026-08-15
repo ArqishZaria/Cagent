@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# install-backup-cron.sh (Azure version)
+# install-backup-cron.sh
 # Copies backup-db.sh into place and schedules it via cron at 0 2 * * *.
 #
 # Usage: sudo bash install-backup-cron.sh
@@ -17,14 +17,12 @@ mkdir -p /opt/voip-saas/backups /var/log/voip-saas
 chown -R voipapp:voipapp /opt/voip-saas/backups /var/log/voip-saas
 
 echo "==> Setting up ~/.pgpass for the voipapp user so pg_dump can authenticate"
-echo "    against Azure Database for PostgreSQL without a password prompt."
+echo "    without a password prompt (required for cron — it has no TTY)."
 PGPASS_FILE="/home/voipapp/.pgpass"
-PG_HOST="voip-saas-pg.postgres.database.azure.com"   # match backup-db.sh
 if [ ! -f "$PGPASS_FILE" ]; then
     read -rsp "Enter the voip_saas_user Postgres password to store in .pgpass: " DB_PASSWORD
     echo
-    # format: hostname:port:database:username:password
-    echo "${PG_HOST}:5432:voip_saas:voip_saas_user:${DB_PASSWORD}" > "$PGPASS_FILE"
+    echo "localhost:5432:voip_saas:voip_saas_user:${DB_PASSWORD}" > "$PGPASS_FILE"
     chown voipapp:voipapp "$PGPASS_FILE"
     chmod 600 "$PGPASS_FILE"
 else
@@ -41,7 +39,5 @@ echo "==> Logs: /var/log/voip-saas/db-backup.log"
 echo
 echo "==> RESTORE DRILL — test this now, don't wait for an emergency:"
 echo "    gunzip -c /opt/voip-saas/backups/voip_saas_<timestamp>.sql.gz | \\"
-echo "      psql \"sslmode=require host=${PG_HOST} dbname=voip_saas_restore_test user=voip_saas_user\""
-echo "    (create voip_saas_restore_test as a throwaway DB first via:"
-echo "     az postgres flexible-server db create --resource-group voip-saas-rg \\"
-echo "       --server-name voip-saas-pg --database-name voip_saas_restore_test)"
+echo "      psql -U voip_saas_user -h localhost -d voip_saas_restore_test"
+echo "    (create voip_saas_restore_test as a throwaway DB first with createdb)"

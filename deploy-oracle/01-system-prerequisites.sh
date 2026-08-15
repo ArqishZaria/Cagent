@@ -1,20 +1,9 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# 01-system-prerequisites.sh (Azure version)
-# Run once on the fresh Azure Ubuntu 24.04 VM. Installs everything the
-# Django/Celery/crawl4ai stack needs.
-#
-# Differences from the Oracle version:
-#   - No `postgresql`/`postgresql-contrib`/`libpq-dev` server install, and no
-#     CREATE USER/CREATE DATABASE step — Postgres is Azure Database for
-#     PostgreSQL (see 00b-provision-postgres.sh), reached over the network.
-#     libpq-dev is still needed (psycopg2-binary needs it at build time on
-#     some platforms) so it's kept.
-#   - No `stress` package and no idle-prevention cron — Azure does not
-#     reclaim idle VMs, unlike Oracle's Always Free tier.
-#   - No ARM/Ampere shape assumption — this targets a standard x86_64 Azure
-#     VM size (e.g. Standard_B2s). If you deployed an Azure ARM VM (Dpsv5/
-#     Epsv5) instead, everything here still works unmodified.
+# 01-system-prerequisites.sh
+# Run once on a fresh Oracle Cloud "Always Free" ARM (Ampere A1) instance,
+# Ubuntu 22.04/24.04. Installs everything the Django/Celery/crawl4ai stack
+# needs, then installs Playwright's Chromium for the scraper.
 #
 # Usage: sudo bash 01-system-prerequisites.sh
 # ==============================================================================
@@ -24,12 +13,13 @@ echo "==> Updating apt and installing system packages"
 apt-get update -y
 apt-get install -y \
     python3 python3-venv python3-pip \
-    libpq-dev \
+    postgresql postgresql-contrib libpq-dev \
     redis-server \
     nginx \
     certbot python3-certbot-nginx \
     git curl unzip \
     build-essential \
+    stress \
     ufw
 
 # --- Application user + directories -----------------------------------------
@@ -62,12 +52,15 @@ else
     echo "    + playwright install commands above manually."
 fi
 
-# --- Redis: local on this VM (default). Skip entirely if you provisioned ---
-# --- Azure Cache for Redis instead — see deploy-azure/README.md.          ---
-echo "==> Enabling and starting local Redis"
-systemctl enable --now redis-server
+# --- PostgreSQL: create DB + user (idempotent) -------------------------------
+echo "==> Configuring PostgreSQL (edit the password below before running!)"
+sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='voip_saas_user'" | grep -q 1 || \
+    sudo -u postgres psql -c "CREATE USER voip_saas_user WITH PASSWORD 'CHANGE_ME_BEFORE_RUNNING';"
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='voip_saas'" | grep -q 1 || \
+    sudo -u postgres psql -c "CREATE DATABASE voip_saas OWNER voip_saas_user;"
 
-echo "==> Done. Postgres is NOT installed here — it's Azure Database for"
-echo "    PostgreSQL (run 00b-provision-postgres.sh from your local machine"
-echo "    if you haven't already). Next: run 02-nginx-ssl.sh, then set up"
-echo "    the systemd services."
+echo "==> Enabling and starting Redis + PostgreSQL"
+systemctl enable --now redis-server
+systemctl enable --now postgresql
+
+echo "==> Done. Next: run 02-idle-fix.sh, 03-firewall.sh, 04-nginx-ssl.sh, then set up the systemd services."

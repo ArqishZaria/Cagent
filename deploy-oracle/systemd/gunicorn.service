@@ -1,7 +1,7 @@
 [Unit]
 Description=Gunicorn — VoIP SaaS Django backend
-After=network.target redis-server.service
-Wants=redis-server.service
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
 
 [Service]
 Type=notify

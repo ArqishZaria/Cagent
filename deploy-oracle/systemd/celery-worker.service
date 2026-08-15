@@ -1,7 +1,7 @@
 [Unit]
 Description=Celery Worker — VoIP SaaS
-After=network.target redis-server.service
-Wants=redis-server.service
+After=network.target redis-server.service postgresql.service
+Wants=redis-server.service postgresql.service
 
 [Service]
 Type=simple
