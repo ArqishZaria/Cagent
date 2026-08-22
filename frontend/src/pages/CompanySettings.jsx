@@ -185,11 +185,20 @@ function TeamCard() {
       await api.post("/api/users/manage/", form);
       setFeedback({ type: "success", text: `Agent account created for ${form.username}.` });
       setForm({ username: "", email: "", first_name: "", last_name: "", password: "" });
-    } catch (err) {
-      setFeedback({
-        type: "error",
-        text: err.response?.data?.detail || "Couldn't create that account. Check the fields and try again.",
-      });
+      } catch (err) {
+      const data = err.response?.data;
+      let message = "Couldn't create that account. Check the fields and try again.";
+      if (data) {
+        if (data.detail) {
+          message = data.detail;
+        } else if (typeof data === "object") {
+          const parts = Object.entries(data).flatMap(([field, errs]) =>
+            (Array.isArray(errs) ? errs : [errs]).map((e) => `${field}: ${e}`)
+          );
+          if (parts.length) message = parts.join(" ");
+        }
+      }
+      setFeedback({ type: "error", text: message });
     } finally {
       setSubmitting(false);
     }
@@ -213,11 +222,14 @@ function TeamCard() {
         <input
           className="input-field sm:col-span-2"
           type="password"
-          placeholder="Temporary password"
+          placeholder="Password"
           required
           value={form.password}
           onChange={update("password")}
         />
+        <p className="text-[11px] text-ink-300 sm:col-span-2 -mt-1">
+          Must be at least 8 characters, not too common, and not entirely numbers.
+        </p>
         <button type="submit" disabled={submitting} className="btn-primary sm:col-span-2 mt-1">
           {submitting ? <Loader2 size={16} className="animate-spin" /> : <PlusCircle size={16} />}
           Create agent account
