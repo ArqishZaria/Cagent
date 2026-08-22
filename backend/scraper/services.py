@@ -18,7 +18,8 @@ import logging
 import google.generativeai as genai
 from crawl4ai import AsyncWebCrawler
 from django.conf import settings
-from duckduckgo_search import DDGS
+from ddgs import DDGS
+from google.api_core.exceptions import ResourceExhausted
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +73,36 @@ def crawl_urls(urls: list[str]) -> str:
     return asyncio.run(_crawl_urls_async(urls))
 
 
+# Try Pro first for the best extraction quality. If your account's Pro-tier
+# quota is exhausted for the moment, fall back to Flash so scraping still
+# works — every new scrape task tries Pro again from scratch, so as soon as
+# your quota resets you're automatically back on Pro with no code changes.
+GEMINI_MODEL_PRIORITY = ("gemini-3.1-pro-preview", "gemini-3.6-flash")
+
+
 def extract_leads_with_gemini(scraped_text: str) -> list[dict]:
     if not scraped_text.strip():
         return []
 
-    model = genai.GenerativeModel("gemini-2.5-flash")
-    response = model.generate_content(EXTRACTION_PROMPT.format(content=scraped_text))
+    prompt = EXTRACTION_PROMPT.format(content=scraped_text)
+    response = None
+
+    for model_name in GEMINI_MODEL_PRIORITY:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            logger.info("Lead extraction succeeded using %s", model_name)
+            break
+        except ResourceExhausted:
+            logger.warning("%s quota exhausted right now, trying next model", model_name)
+            continue
+        except Exception:
+            logger.exception("Gemini call failed on %s", model_name)
+            continue
+
+    if response is None:
+        logger.error("All Gemini models failed or were rate-limited this run")
+        return []
 
     raw = (response.text or "").strip()
     # Gemini occasionally wraps output in ```json ... ``` despite instructions not to.
