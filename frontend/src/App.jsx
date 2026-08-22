@@ -6,6 +6,8 @@ import PaymentOverdueOverlay from "./components/PaymentOverdueOverlay";
 import CompanySettingsPage from "./pages/CompanySettings";
 import AgenticProspectorPage from "./pages/AgenticProspector";
 import CrmDialerPage from "./pages/CrmDialerView";
+import LoginPage from "./pages/Login";
+import RequireAuth from "./components/RequireAuth";
 
 const NAV_ITEMS = [
   { to: "/", label: "CRM & Dialer", icon: PhoneCall },
@@ -26,10 +28,11 @@ export default function App() {
         <SideNav />
         <main className="flex-1">
           <Routes>
-            <Route path="/" element={<CrmDialerPage />} />
-            <Route path="/prospector" element={<AgenticProspectorPage />} />
-            <Route path="/settings" element={<CompanySettingsPage />} />
-          </Routes>
+  		<Route path="/login" element={<LoginPage />} />
+  		<Route path="/" element={<RequireAuth><CrmDialerPage /></RequireAuth>} />
+  		<Route path="/prospector" element={<RequireAuth><AgenticProspectorPage /></RequireAuth>} />
+  		<Route path="/settings" element={<RequireAuth><CompanySettingsPage /></RequireAuth>} />
+	  </Routes>
         </main>
       </div>
 
