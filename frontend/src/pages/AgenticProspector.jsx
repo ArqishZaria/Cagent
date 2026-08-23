@@ -139,8 +139,8 @@ function ScrapingState() {
       <div className="text-center">
         <p className="font-display text-lg">Scraping live data…</p>
         <p className="text-xs text-ink-300 font-mono mt-1">
-          duckduckgo-search → crawl4ai → gemini-2.5-flash
-        </p>
+	      Searching, verifying, and qualifying leads…
+	</p>
       </div>
     </div>
   );

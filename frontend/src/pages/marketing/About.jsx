@@ -9,13 +9,13 @@ export default function AboutPage() {
       <PublicNav />
 
       <section className="max-w-4xl mx-auto px-6 pt-24 pb-16">
-        <span className="label-eyebrow inline-block mb-5">About Signal</span>
+        <span className="label-eyebrow inline-block mb-5">About cagent</span>
         <h1 className="font-display text-4xl sm:text-5xl font-semibold mb-6 leading-tight">
           Built by people tired of switching tabs to talk to a customer.
         </h1>
         <p className="text-ink-200 text-lg leading-relaxed max-w-2xl">
           Most sales teams run their phone system, their CRM, and their lead lists in three
-          different tools that don't talk to each other. Signal puts all three in one place — so
+          different tools that don't talk to each other. cagent puts all three in one place — so
           a call updates the CRM automatically, a text thread lives on the lead's profile, and
           new leads show up without anyone opening a spreadsheet.
         </p>

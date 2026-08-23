@@ -1,26 +1,63 @@
+import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, MessageSquareText, PhoneCall, Sparkles } from "lucide-react";
 import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
 import SignalMesh3D from "../../components/marketing/SignalMesh3D";
 import LiveTicker from "../../components/marketing/LiveTicker";
+import Reveal from "../../components/marketing/Reveal";
 
 export default function MarketingHome() {
+  const spotlightRef = useRef(null);
+
+  const handleMouseMove = (e) => {
+    const el = spotlightRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    el.style.setProperty("--spot-x", `${x}%`);
+    el.style.setProperty("--spot-y", `${y}%`);
+  };
+
   return (
     <div className="min-h-screen bg-ink-900">
       <PublicNav />
 
-      {/* Hero — the 3D signal mesh IS the product's thesis: a live network
-          of calls and leads moving through the system in real time. */}
-      <section className="relative overflow-hidden border-b border-ink-500/40">
+      {/* Hero — the 3D signal mesh is a literal picture of the product:
+          calls and leads flowing through a live network. */}
+      <section
+        ref={spotlightRef}
+        onMouseMove={handleMouseMove}
+        className="relative overflow-hidden border-b border-ink-500/40"
+        style={{ "--spot-x": "50%", "--spot-y": "35%" }}
+      >
         <div className="absolute inset-0">
-          <SignalMesh3D className="w-full h-full opacity-80" />
+          <SignalMesh3D className="w-full h-full" />
         </div>
+
+        {/* Cursor-reactive glow: brightens the field around the pointer */}
+        <div
+          className="absolute inset-0 pointer-events-none mix-blend-screen opacity-70 transition-opacity"
+          style={{
+            background:
+              "radial-gradient(420px circle at var(--spot-x) var(--spot-y), rgba(124,140,255,0.16), transparent 70%)",
+          }}
+        />
+        {/* Vignette to keep text legible over the scene */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse 70% 60% at 50% 40%, transparent, rgba(10,14,23,0.55) 70%, #0A0E17 100%)",
+              "radial-gradient(ellipse 70% 60% at 50% 40%, transparent, rgba(10,14,23,0.6) 72%, #0A0E17 100%)",
+          }}
+        />
+        {/* Subtle grain — keeps the dark field from reading flat */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
           }}
         />
 
@@ -34,7 +71,7 @@ export default function MarketingHome() {
             Every lead is one number away.
           </h1>
           <p className="text-ink-200 text-lg max-w-2xl mx-auto mb-10 leading-relaxed">
-            Signal gives your team a browser-based phone, a CRM that updates itself from every
+            cagent gives your team a browser-based phone, a CRM that updates itself from every
             call and text, and an AI prospector that finds new leads before your team runs out
             of ones to call.
           </p>
@@ -55,56 +92,70 @@ export default function MarketingHome() {
         </div>
       </section>
 
-      {/* Feature trio — not a numbered sequence, these are three parallel
-          capabilities, so no 01/02/03 markers. */}
+      {/* Feature trio */}
       <section className="max-w-6xl mx-auto px-6 py-24">
         <div className="grid md:grid-cols-3 gap-6">
-          <FeatureCard
-            icon={PhoneCall}
-            color="signal"
-            title="Dial from the browser"
-            description="A real WebRTC phone built into the CRM. Buy a number, assign it to an agent, and calls start routing — no desk phone, no separate app."
-          />
-          <FeatureCard
-            icon={MessageSquareText}
-            color="live"
-            title="Texts that stay compliant"
-            description="Every conversation lives on the lead's timeline. Reply STOP and Signal locks that contact out automatically — no manual tracking required."
-          />
-          <FeatureCard
-            icon={Sparkles}
-            color="amber"
-            title="AI finds your next leads"
-            description="Describe who you're looking for. Signal searches the web, reads the pages, and hands your team a list of real contacts to call."
-          />
+          <Reveal delay={0}>
+            <FeatureCard
+              icon={PhoneCall}
+              color="signal"
+              title="Dial from the browser"
+              description="A real phone built into the CRM. Buy a number, assign it to an agent, and calls start routing — no desk phone, no separate app."
+            />
+          </Reveal>
+          <Reveal delay={100}>
+            <FeatureCard
+              icon={MessageSquareText}
+              color="live"
+              title="Texts that stay compliant"
+              description="Every conversation lives on the lead's timeline. Reply STOP and cagent locks that contact out automatically — no manual tracking required."
+            />
+          </Reveal>
+          <Reveal delay={200}>
+            <FeatureCard
+              icon={Sparkles}
+              color="amber"
+              title="AI finds your next leads"
+              description="Describe who you're looking for. cagent searches, qualifies, and hands your team a list of real contacts to call — no spreadsheets involved."
+            />
+          </Reveal>
         </div>
       </section>
 
-      {/* How it works — this genuinely is a sequence, so numbering earns its
-          place here. */}
+      {/* How it works — genuinely a sequence, so numbering earns its place */}
       <section className="border-y border-ink-500/40 bg-ink-800/40">
         <div className="max-w-5xl mx-auto px-6 py-24">
-          <p className="label-eyebrow text-center mb-3">How it works</p>
-          <h2 className="font-display text-3xl font-semibold text-center mb-14">
-            From search to closed, in one place
-          </h2>
+          <Reveal>
+            <p className="label-eyebrow text-center mb-3">How it works</p>
+            <h2 className="font-display text-3xl font-semibold text-center mb-14">
+              From search to closed, in one place
+            </h2>
+          </Reveal>
           <div className="grid sm:grid-cols-3 gap-8">
-            <Step number="01" title="Search" description="Tell the Prospector who you're looking for. It searches, reads, and qualifies contacts automatically." />
-            <Step number="02" title="Connect" description="Call or text straight from the lead's profile. Every interaction logs itself to their timeline." />
-            <Step number="03" title="Close" description="Move leads through your pipeline and watch deal value roll up in real time, per agent and per team." />
+            <Reveal delay={0}>
+              <Step number="01" title="Search" description="Tell the Prospector who you're looking for. It finds and qualifies real contacts automatically." />
+            </Reveal>
+            <Reveal delay={100}>
+              <Step number="02" title="Connect" description="Call or text straight from the lead's profile. Every interaction logs itself to their timeline." />
+            </Reveal>
+            <Reveal delay={200}>
+              <Step number="03" title="Close" description="Move leads through your pipeline and watch deal value roll up in real time, per agent and per team." />
+            </Reveal>
           </div>
         </div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-6 py-24 text-center">
-        <h2 className="font-display text-3xl sm:text-4xl font-semibold mb-5">
-          Give your team a phone that already knows the customer.
-        </h2>
-        <p className="text-ink-200 mb-8">No setup fees. No contracts. Cancel any time.</p>
-        <Link to="/contact" className="btn-primary !px-7 !py-3.5 text-sm inline-flex">
-          Start free <ArrowRight size={16} />
-        </Link>
-      </section>
+      <Reveal>
+        <section className="max-w-4xl mx-auto px-6 py-24 text-center">
+          <h2 className="font-display text-3xl sm:text-4xl font-semibold mb-5">
+            Give your team a phone that already knows the customer.
+          </h2>
+          <p className="text-ink-200 mb-8">No setup fees. No contracts. Cancel any time.</p>
+          <Link to="/contact" className="btn-primary !px-7 !py-3.5 text-sm inline-flex">
+            Start free <ArrowRight size={16} />
+          </Link>
+        </section>
+      </Reveal>
 
       <PublicFooter />
     </div>

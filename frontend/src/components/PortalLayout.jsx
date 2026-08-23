@@ -34,7 +34,7 @@ function SideNav() {
   return (
     <nav className="w-56 shrink-0 border-r border-ink-500/50 bg-ink-800/60 backdrop-blur px-3 py-6 hidden md:flex flex-col gap-1">
       <div className="px-3 mb-6">
-        <span className="font-display font-semibold text-lg tracking-tight">Signal</span>
+        <span className="font-display font-semibold text-lg tracking-tight">cagent</span>
       </div>
       {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
         <NavLink

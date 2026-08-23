@@ -18,7 +18,7 @@ export default function PublicNav() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5">
           <SignalBars bars={4} size="sm" color="signal" />
-          <span className="font-display font-semibold text-lg tracking-tight">Signal</span>
+          <span className="font-display font-semibold text-lg tracking-tight">cagent</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">

@@ -8,7 +8,7 @@ export default function PublicFooter() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <SignalBars bars={4} size="sm" color="signal" active={false} />
-            <span className="font-display font-semibold text-lg">Signal</span>
+            <span className="font-display font-semibold text-lg">cagent</span>
           </div>
           <p className="text-sm text-ink-300 leading-relaxed max-w-xs">
             One phone system, one CRM, one place your leads actually get worked.
@@ -36,7 +36,7 @@ export default function PublicFooter() {
       </div>
       <div className="border-t border-ink-500/30 py-6">
         <p className="text-center text-xs text-ink-300 font-mono">
-          © {new Date().getFullYear()} Signal. All rights reserved.
+          © {new Date().getFullYear()} cagent. All rights reserved.
         </p>
       </div>
     </footer>

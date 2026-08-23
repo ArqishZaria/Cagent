@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2.5 justify-center mb-8">
           <SignalBars bars={4} size="sm" color="signal" />
-          <span className="font-display font-semibold text-xl">Signal</span>
+          <span className="font-display font-semibold text-xl">cagent</span>
         </div>
 
         <div className="card p-8">

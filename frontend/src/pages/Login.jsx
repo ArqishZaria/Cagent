@@ -38,7 +38,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2.5 justify-center mb-8">
           <SignalBars bars={4} size="sm" color="signal" />
-          <span className="font-display font-semibold text-xl">Signal</span>
+          <span className="font-display font-semibold text-xl">cagent</span>
         </div>
 
         <form onSubmit={submit} className="card p-8">
@@ -77,7 +77,7 @@ export default function LoginPage() {
 
         <p className="text-center text-xs text-ink-300 mt-6">
           <Link to="/" className="hover:text-ink-100 transition">
-            &larr; Back to signal.app
+            &larr; Back to cagent
           </Link>
         </p>
       </div>
