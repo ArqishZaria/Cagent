@@ -1,41 +1,68 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Briefcase, Globe, Mail, Search, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertTriangle, Database, Globe, Search, Sparkles } from "lucide-react";
 import api from "../lib/api";
 import SignalBars from "../components/SignalBars";
+import LeadListItem from "../components/LeadListItem";
 
 const POLL_INTERVAL_MS = 2500;
-const POLL_TIMEOUT_MS = 120000;
+// Raised from 2 minutes -> 5 minutes: scraping more candidate sites (see
+// scraper.services.SEARCH_RESULT_LIMIT) genuinely takes longer, even with
+// concurrent crawling.
+const POLL_TIMEOUT_MS = 300000;
 
 /**
  * AgenticProspectorPage
  *
- * POST /api/scraper/search/ (Day 4) queues a ScrapeTask and returns its id
- * with status PENDING immediately — the actual search -> crawl -> Gemini
- * extraction happens asynchronously in a Celery worker. This page polls a
- * status endpoint until the task flips to COMPLETED or FAILED, then loads
- * the leads it produced.
+ * Two-stage search, shown as two clearly separate sections:
+ *   1. "From your database" — an instant text search across leads you
+ *      already have (GET /api/scraper/existing-leads/), so a repeated or
+ *      similar query doesn't make you wait on a fresh scrape for contacts
+ *      you've already found before.
+ *   2. "New from the web" — the existing scrape pipeline (POST
+ *      /api/scraper/search/ -> poll -> GET /api/leads/?scrape_task=<id>),
+ *      for anything not already in your database.
  *
- * NOTE: polling assumes GET /api/scraper/tasks/<id>/ and a way to fetch the
- * leads that task produced (e.g. GET /api/leads/?scrape_task=<id>) — the Day
- * 4 backend built the task + Lead-saving side but not a dedicated read
- * endpoint yet. Wiring this against that expected contract; flagging the gap
- * the same way as the number-purchasing endpoints in Company Settings.
+ * Both sections render through the same LeadListItem component used in the
+ * CRM, and "Contact" on either one jumps straight to that lead's SMS thread.
  */
 export default function AgenticProspectorPage() {
   const [query, setQuery] = useState("");
-  const [task, setTask] = useState(null); // { id, status }
-  const [leads, setLeads] = useState([]);
+  const [existingLeads, setExistingLeads] = useState([]);
+  const [existingSearched, setExistingSearched] = useState(false);
+  const [task, setTask] = useState(null);
+  const [newLeads, setNewLeads] = useState([]);
   const [error, setError] = useState("");
   const pollRef = useRef(null);
   const startedAtRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => () => clearInterval(pollRef.current), []);
+
+  const contactLead = (lead) => {
+    navigate("/app", { state: { leadId: lead.id } });
+  };
 
   const search = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
     setError("");
-    setLeads([]);
+    setNewLeads([]);
+    setExistingLeads([]);
+    setExistingSearched(false);
+    setTask(null);
+
+    // Stage 1 — instant lookup against leads already in the database.
+    try {
+      const res = await api.get("/api/scraper/existing-leads/", { params: { query } });
+      setExistingLeads(res.data || []);
+    } catch {
+      // Non-fatal — the fresh scrape below still runs either way.
+    } finally {
+      setExistingSearched(true);
+    }
+
+    // Stage 2 — kick off a fresh web scrape for anything not already found.
     try {
       const res = await api.post("/api/scraper/search/", { query });
       setTask({ id: res.data.id, status: res.data.status });
@@ -64,7 +91,10 @@ export default function AgenticProspectorPage() {
         if (res.data.status === "COMPLETED") {
           clearInterval(pollRef.current);
           const leadsRes = await api.get("/api/leads/", { params: { scrape_task: taskId } });
-          setLeads(leadsRes.data?.results || leadsRes.data || []);
+          const scraped = leadsRes.data?.results || leadsRes.data || [];
+          // Avoid showing a lead twice if the database search already surfaced it.
+          const existingIds = new Set(existingLeads.map((l) => l.id));
+          setNewLeads(scraped.filter((l) => !existingIds.has(l.id)));
         } else if (res.data.status === "FAILED") {
           clearInterval(pollRef.current);
           setError("This search didn't turn up usable results — try a more specific query.");
@@ -85,7 +115,7 @@ export default function AgenticProspectorPage() {
             <Sparkles size={22} />
           </div>
           <div>
-            <span className="label-eyebrow">$0 agentic lead generation</span>
+            <span className="label-eyebrow">AI-powered lead generation</span>
             <h1 className="text-2xl font-display font-semibold">The Prospector</h1>
           </div>
         </div>
@@ -107,7 +137,7 @@ export default function AgenticProspectorPage() {
             Prospect
           </button>
         </form>
-        <p className="text-[11px] text-ink-300 mb-8">Max 5 searches per hour.</p>
+        <p className="text-[11px] text-ink-300 mb-8">Max 5 fresh web searches per hour.</p>
 
         {error && (
           <div className="flex items-start gap-2 rounded-xl border border-alert/30 bg-alert/10 px-4 py-3 mb-8 text-sm text-alert">
@@ -116,17 +146,38 @@ export default function AgenticProspectorPage() {
           </div>
         )}
 
-        {isScraping && <ScrapingState />}
-
-        {!isScraping && leads.length > 0 && <LeadsGrid leads={leads} />}
-
-        {!isScraping && task?.status === "COMPLETED" && leads.length === 0 && (
-          <p className="text-sm text-ink-300 text-center py-16">
-            No qualifying leads found in that search. Try broadening the query.
-          </p>
+        {/* Stage 1 results — from the database */}
+        {existingSearched && existingLeads.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center gap-2 mb-4">
+              <Database size={15} className="text-signal-bright" />
+              <h2 className="font-display font-semibold text-sm">
+                From your database <span className="text-ink-300 font-normal">({existingLeads.length})</span>
+              </h2>
+            </div>
+            <LeadsGrid leads={existingLeads} onContact={contactLead} />
+          </section>
         )}
 
-        {!task && !error && <EmptyState />}
+        {/* Stage 2 — the fresh web scrape */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Globe size={15} className="text-live" />
+            <h2 className="font-display font-semibold text-sm">New from the web</h2>
+          </div>
+
+          {isScraping && <ScrapingState />}
+
+          {!isScraping && newLeads.length > 0 && <LeadsGrid leads={newLeads} onContact={contactLead} />}
+
+          {!isScraping && task?.status === "COMPLETED" && newLeads.length === 0 && (
+            <p className="text-sm text-ink-300 text-center py-12">
+              No new leads found beyond what's already in your database. Try broadening the query.
+            </p>
+          )}
+
+          {!task && !error && existingLeads.length === 0 && existingSearched === false && <EmptyState />}
+        </section>
       </div>
     </div>
   );
@@ -134,56 +185,29 @@ export default function AgenticProspectorPage() {
 
 function ScrapingState() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 gap-5 animate-fade-up">
+    <div className="flex flex-col items-center justify-center py-16 gap-5 animate-fade-up">
       <SignalBars bars={9} size="lg" color="amber" />
-      <div className="text-center">
-        <p className="font-display text-lg">Scraping live data…</p>
-        <p className="text-xs text-ink-300 font-mono mt-1">
-	      Searching, verifying, and qualifying leads…
-	</p>
-      </div>
+      <p className="font-display text-lg">Searching and qualifying leads…</p>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="text-center py-20 border border-dashed border-ink-500/50 rounded-2xl">
+    <div className="text-center py-16 border border-dashed border-ink-500/50 rounded-2xl">
       <p className="text-ink-200 text-sm">
-        Describe who you're looking for — industry, city, role — and the agent will find and
+        Describe who you're looking for — industry, city, role — and cagent will find and
         extract contacts for you.
       </p>
     </div>
   );
 }
 
-function LeadsGrid({ leads }) {
+function LeadsGrid({ leads, onContact }) {
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-up">
-      {leads.map((lead, i) => (
-        <div key={lead.id || i} className="card p-4">
-          <p className="font-display font-semibold text-sm">
-            {lead.first_name} {lead.last_name}
-          </p>
-          {lead.job_title && (
-            <p className="flex items-center gap-1.5 text-xs text-ink-200 mt-1">
-              <Briefcase size={12} /> {lead.job_title}
-            </p>
-          )}
-          {lead.company && <p className="text-xs text-ink-300 mt-0.5">{lead.company}</p>}
-          <div className="mt-3 pt-3 border-t border-ink-500/40 space-y-1.5">
-            {lead.email && (
-              <p className="flex items-center gap-1.5 text-xs font-mono text-ink-100 truncate">
-                <Mail size={12} className="shrink-0" /> {lead.email}
-              </p>
-            )}
-            {lead.website && (
-              <p className="flex items-center gap-1.5 text-xs font-mono text-ink-100 truncate">
-                <Globe size={12} className="shrink-0" /> {lead.website}
-              </p>
-            )}
-          </div>
-        </div>
+      {leads.map((lead) => (
+        <LeadListItem key={lead.id} lead={lead} onContact={onContact} />
       ))}
     </div>
   );

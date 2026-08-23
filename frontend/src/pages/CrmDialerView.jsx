@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { DollarSign, PhoneCall } from "lucide-react";
 import api from "../lib/api";
 import AppTelnyxProvider from "../lib/TelnyxProvider";
 import LeadChatPanel from "../components/LeadChatPanel";
 import Dialer from "../components/Dialer";
+import LeadListItem from "../components/LeadListItem";
 
 const PIPELINE_ORDER = ["NEW", "CONTACTED", "QUALIFIED", "WON", "LOST"];
 
@@ -11,18 +13,26 @@ export default function CrmDialerPage() {
   const [leads, setLeads] = useState([]);
   const [activeLeadId, setActiveLeadId] = useState(null);
   const [fromNumber, setFromNumber] = useState(null);
+  const location = useLocation();
 
   useEffect(() => {
     api.get("/api/leads/").then((res) => {
       const data = res.data?.results || res.data || [];
       setLeads(data);
-      if (data.length && !activeLeadId) setActiveLeadId(data[0].id);
+      // If we arrived here via a Prospector "Contact" click, jump straight
+      // to that lead's thread. Otherwise default to the first lead.
+      const requestedLeadId = location.state?.leadId;
+      if (requestedLeadId && data.some((l) => l.id === requestedLeadId)) {
+        setActiveLeadId(requestedLeadId);
+      } else if (data.length && !activeLeadId) {
+        setActiveLeadId(data[0].id);
+      }
     });
-    // The number this agent dials/texts FROM — first assigned PhoneNumber.
     api.get("/api/telephony/numbers/").then((res) => {
       const owned = res.data?.results || res.data || [];
       if (owned.length) setFromNumber(owned[0].phone_number);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const activeLead = leads.find((l) => l.id === activeLeadId) || null;
@@ -98,26 +108,13 @@ function LeadList({ leads, activeLeadId, onSelect }) {
   return (
     <div className="card p-3 h-[calc(100vh-220px)] overflow-y-auto space-y-1.5">
       {leads.map((lead) => (
-        <button
+        <LeadListItem
           key={lead.id}
-          onClick={() => onSelect(lead.id)}
-          className={`w-full text-left rounded-xl px-3.5 py-3 transition ${
-            lead.id === activeLeadId
-              ? "bg-signal/15 border border-signal/40"
-              : "hover:bg-ink-600/60 border border-transparent"
-          }`}
-        >
-          <p className="text-sm font-medium text-ink-50 truncate">
-            {lead.first_name} {lead.last_name}
-          </p>
-          <p className="text-[11px] text-ink-300 truncate">{lead.company}</p>
-          <div className="flex items-center justify-between mt-1.5">
-            <span className="text-[10px] font-mono uppercase tracking-wide text-ink-300">{lead.status}</span>
-            {lead.deal_value ? (
-              <span className="text-[10px] font-mono text-amber">${Number(lead.deal_value).toLocaleString()}</span>
-            ) : null}
-          </div>
-        </button>
+          lead={lead}
+          compact
+          active={lead.id === activeLeadId}
+          onSelect={() => onSelect(lead.id)}
+        />
       ))}
       {leads.length === 0 && <p className="text-xs text-ink-300 px-2 py-4">No leads yet.</p>}
     </div>

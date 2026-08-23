@@ -50,6 +50,9 @@ def run_lead_scrape(self, scrape_task_id):
                     "job_title": lead_data.get("job_title", ""),
                     "company": lead_data.get("company", ""),
                     "website": lead_data.get("website", ""),
+                    "address": lead_data.get("address", ""),
+                    "city": lead_data.get("city", ""),
+                    "state": lead_data.get("state", ""),
                     "status": Lead.Status.NEW,
                 },
             )
