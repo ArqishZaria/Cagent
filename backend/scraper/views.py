@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import Lead, ScrapeTask
+from core.models import CustomUser, Lead, ScrapeTask
 from core.permissions import IsTenantMember
 from crm.serializers import LeadSerializer
 from scraper.tasks import run_lead_scrape
@@ -79,9 +79,9 @@ class ExistingLeadsSearchView(APIView):
     a past search show up immediately, before (and independent of) the
     slower background web scrape for anything new.
 
-    Matches if ANY search term appears in company, city, state, job_title,
-    first_name, or last_name — deliberately loose, since the goal here is
-    "show me what I probably already have," not an exact-match filter.
+    Ownership rule matches the rest of the CRM (LeadViewSet): an AGENT only
+    sees their own leads here (what they personally found or uploaded); an
+    ADMIN sees the tenant's combined list, everyone's leads together.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -102,9 +102,9 @@ class ExistingLeadsSearchView(APIView):
                 | Q(last_name__icontains=term)
             )
 
-        leads = (
-            Lead.objects.filter(tenant=request.user.tenant)
-            .filter(q_filter)
-            .order_by("-created_at")[:50]
-        )
+        leads = Lead.objects.filter(tenant=request.user.tenant).filter(q_filter)
+        if request.user.role == CustomUser.Role.AGENT:
+            leads = leads.filter(owner=request.user)
+
+        leads = leads.order_by("-created_at")[:50]
         return Response(LeadSerializer(leads, many=True).data)

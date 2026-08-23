@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, PhoneCall, Sparkles } from "lucide-react";
+import { Building2, ClipboardList, PhoneCall, Sparkles } from "lucide-react";
 import { onPaymentRequired } from "../lib/api";
 import PaymentOverdueOverlay from "./PaymentOverdueOverlay";
 import useIdleLogout from "../hooks/useIdleLogout";
@@ -8,6 +8,7 @@ import useIdleLogout from "../hooks/useIdleLogout";
 const NAV_ITEMS = [
   { to: "/app", label: "CRM & Dialer", icon: PhoneCall },
   { to: "/app/prospector", label: "Prospector", icon: Sparkles },
+  { to: "/app/leads", label: "Leads", icon: ClipboardList },
   { to: "/app/settings", label: "Company Settings", icon: Building2 },
 ];
 

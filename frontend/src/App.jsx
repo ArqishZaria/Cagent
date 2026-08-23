@@ -12,6 +12,7 @@ import PortalLayout from "./components/PortalLayout";
 import CrmDialerPage from "./pages/CrmDialerView";
 import AgenticProspectorPage from "./pages/AgenticProspector";
 import CompanySettingsPage from "./pages/CompanySettings";
+import LeadsPage from "./pages/LeadsPage";
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
         >
           <Route index element={<CrmDialerPage />} />
           <Route path="prospector" element={<AgenticProspectorPage />} />
+          <Route path="leads" element={<LeadsPage />} />
           <Route path="settings" element={<CompanySettingsPage />} />
         </Route>
       </Routes>

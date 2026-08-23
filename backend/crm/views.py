@@ -1,7 +1,10 @@
+from django.db.models import Q
+from rest_framework.exceptions import ValidationError
+
 from core.models import Interaction, Lead
 from core.viewsets import TenantModelViewSet
 from crm.serializers import InteractionSerializer, LeadSerializer
-from rest_framework.exceptions import ValidationError
+
 
 class LeadViewSet(TenantModelViewSet):
     """
@@ -11,11 +14,42 @@ class LeadViewSet(TenantModelViewSet):
       ?scrape_task=<id>  — leads produced by one Agentic Prospector search
       ?status=<STATUS>
       ?owner=<user_id>
+      ?search=<text>     — matches company, city, state, name, email, or phone
+                           (used by the standing Leads page's search box)
+
+    Ownership rule (per TenantModelViewSet + agent_owner_field below):
+    an AGENT only ever sees leads where owner == themselves — their own
+    personal list. An ADMIN sees every lead in the tenant — the combined
+    team-wide list.
     """
 
     serializer_class = LeadSerializer
     queryset = Lead.objects.all().order_by("-created_at")
     agent_owner_field = "owner"  # AGENT only sees their own leads (Day 2 pattern)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        if params.get("scrape_task"):
+            qs = qs.filter(scrape_task_id=params["scrape_task"])
+        if params.get("status"):
+            qs = qs.filter(status=params["status"])
+        if params.get("owner"):
+            qs = qs.filter(owner_id=params["owner"])
+        if params.get("search"):
+            search_filter = Q()
+            for term in params["search"].split():
+                search_filter |= (
+                    Q(company__icontains=term)
+                    | Q(city__icontains=term)
+                    | Q(state__icontains=term)
+                    | Q(first_name__icontains=term)
+                    | Q(last_name__icontains=term)
+                    | Q(email__icontains=term)
+                    | Q(phone_number__icontains=term)
+                )
+            qs = qs.filter(search_filter)
+        return qs
 
     def perform_create(self, serializer):
         tenant = self.request.user.tenant
@@ -26,17 +60,6 @@ class LeadViewSet(TenantModelViewSet):
         if phone and Lead.objects.filter(tenant=tenant, phone_number=phone).exists():
             raise ValidationError({"phone_number": "A lead with this phone number already exists."})
         super().perform_create(serializer)
-        
-    def get_queryset(self):
-        qs = super().get_queryset()
-        params = self.request.query_params
-        if params.get("scrape_task"):
-            qs = qs.filter(scrape_task_id=params["scrape_task"])
-        if params.get("status"):
-            qs = qs.filter(status=params["status"])
-        if params.get("owner"):
-            qs = qs.filter(owner_id=params["owner"])
-        return qs
 
 
 class InteractionViewSet(TenantModelViewSet):
@@ -69,7 +92,5 @@ class InteractionViewSet(TenantModelViewSet):
         user = self.request.user
         serializer.validated_data.pop("tenant", None)
         serializer.validated_data.pop("tenant_id", None)
-        # Default to the requesting user if the client didn't specify one
-        # (e.g. the dialer's call-note save doesn't send a `user` field).
         assigned_user = serializer.validated_data.get("user") or user
         serializer.save(tenant=user.tenant, user=assigned_user)
