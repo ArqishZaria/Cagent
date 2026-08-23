@@ -2,6 +2,7 @@ import logging
 
 from celery import shared_task
 
+from core.lead_dedup import find_or_create_lead
 from core.models import Lead, ScrapeTask
 from scraper.services import crawl_urls, extract_leads_with_gemini, search_urls
 
@@ -37,21 +38,19 @@ def run_lead_scrape(self, scrape_task_id):
             if not email and not phone:
                 continue  # nothing to dedupe or contact on — skip
 
-            lookup = {"tenant": scrape_task.tenant}
-            lookup.update({"email": email} if email else {"phone_number": phone})
-
-            _lead, was_created = Lead.objects.get_or_create(
-                **lookup,
+            _lead, was_created = find_or_create_lead(
+                tenant=scrape_task.tenant,
+                email=email,
+                phone=phone,
+                owner=scrape_task.requested_by,
+                scrape_task=scrape_task,
                 defaults={
                     "first_name": lead_data.get("first_name", ""),
                     "last_name": lead_data.get("last_name", ""),
                     "job_title": lead_data.get("job_title", ""),
                     "company": lead_data.get("company", ""),
-                    "phone_number": phone,
                     "website": lead_data.get("website", ""),
                     "status": Lead.Status.NEW,
-                    "owner": scrape_task.requested_by,
-                    "scrape_task": scrape_task,
                 },
             )
             if was_created:

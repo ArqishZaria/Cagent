@@ -121,6 +121,9 @@ class Lead(models.Model):
     phone_number = models.CharField(max_length=32, blank=True)
     email = models.EmailField(blank=True)
     website = models.URLField(blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
     deal_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     do_not_contact = models.BooleanField(
@@ -140,6 +143,18 @@ class Lead(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "email"],
+                condition=~models.Q(email=""),
+                name="unique_tenant_email_when_present",
+            ),
+            models.UniqueConstraint(
+                fields=["tenant", "phone_number"],
+                condition=~models.Q(phone_number=""),
+                name="unique_tenant_phone_when_present",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} — {self.company}".strip()

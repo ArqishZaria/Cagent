@@ -85,8 +85,6 @@ class InvoiceAdmin(admin.ModelAdmin):
             tenant.subscription_status = Tenant.SubscriptionStatus.ACTIVE
             tenant.last_payment_date = timezone.now().date()
 
-            # Extend from "today" if already lapsed, otherwise extend from the
-            # existing end date so early payments stack correctly.
             base_date = tenant.subscription_end_date
             if not base_date or base_date < timezone.now().date():
                 base_date = timezone.now().date()
@@ -119,9 +117,6 @@ class CustomUserAdmin(UserAdmin):
     search_fields = ("username", "email", "first_name", "last_name", "tenant__company_name")
     list_editable = ("role",)
 
-    # Extend the stock UserAdmin fieldsets with our custom fields so the
-    # platform owner can reassign role / tenant directly from the user's
-    # change form (this is what enables "moving users between tenants").
     fieldsets = UserAdmin.fieldsets + (
         ("Tenant & Role", {"fields": ("tenant", "role")}),
     )
@@ -153,6 +148,8 @@ class LeadAdmin(admin.ModelAdmin):
     list_display = (
         "full_name",
         "company",
+        "city",
+        "state",
         "phone_number",
         "status",
         "deal_value",
@@ -195,8 +192,6 @@ class SupportMessageAdmin(admin.ModelAdmin):
     list_filter = ("tenant", "is_from_platform_owner", "timestamp")
     search_fields = ("message", "tenant__company_name", "sender__username")
     readonly_fields = ("timestamp",)
-    # Deliberately NOT read-only on `message` — the platform owner needs to be
-    # able to fully edit any message, including the automated invoice notices.
     fields = ("tenant", "sender", "is_from_platform_owner", "message", "timestamp")
 
     @admin.display(description="Message")

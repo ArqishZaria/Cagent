@@ -10,7 +10,8 @@ class LeadSerializer(serializers.ModelSerializer):
         # server-side (see core/viewsets.py) and ignores anything sent here.
         fields = (
             "id", "first_name", "last_name", "job_title", "company",
-            "phone_number", "email", "website", "status", "deal_value",
+            "phone_number", "email", "website", "address", "city", "state",
+            "status", "deal_value",
             "do_not_contact", "owner", "scrape_task", "created_at", "updated_at",
         )
         read_only_fields = ("id", "do_not_contact", "scrape_task", "created_at", "updated_at")

@@ -1,7 +1,7 @@
 from core.models import Interaction, Lead
 from core.viewsets import TenantModelViewSet
 from crm.serializers import InteractionSerializer, LeadSerializer
-
+from rest_framework.exceptions import ValidationError
 
 class LeadViewSet(TenantModelViewSet):
     """
@@ -17,6 +17,16 @@ class LeadViewSet(TenantModelViewSet):
     queryset = Lead.objects.all().order_by("-created_at")
     agent_owner_field = "owner"  # AGENT only sees their own leads (Day 2 pattern)
 
+    def perform_create(self, serializer):
+        tenant = self.request.user.tenant
+        email = (serializer.validated_data.get("email") or "").strip()
+        phone = (serializer.validated_data.get("phone_number") or "").strip()
+        if email and Lead.objects.filter(tenant=tenant, email__iexact=email).exists():
+            raise ValidationError({"email": "A lead with this email already exists."})
+        if phone and Lead.objects.filter(tenant=tenant, phone_number=phone).exists():
+            raise ValidationError({"phone_number": "A lead with this phone number already exists."})
+        super().perform_create(serializer)
+        
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params
