@@ -38,8 +38,12 @@ export default function Dialer({ activeLead, onSaveNote, fromNumber }) {
 
   const call = () => {
     const destination = activeLead?.phone_number || digits;
-    if (!destination || !client) return;
-    client.newCall({ destinationNumber: destination, callerName: activeLead?.company || "" });
+    if (!destination || !client || !fromNumber) return;
+    client.newCall({
+      destinationNumber: destination,
+      callerNumber: fromNumber,
+      callerName: activeLead?.company || "",
+    });
   };
 
   const hangup = () => {
