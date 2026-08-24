@@ -97,15 +97,16 @@ def send_sms(from_number: str, to_number: str, text: str):
 
 def search_available_numbers(area_code: str, limit: int = 10) -> list[dict]:
     """
-    GET /v2/available_phone_numbers — returns candidate US numbers starting
-    with the given area code, along with Telnyx's monthly cost estimate so
-    we can store it on PhoneNumber.monthly_cost at purchase time.
+    GET /v2/available_phone_numbers — returns candidate US numbers in the
+    given area code, along with Telnyx's monthly cost estimate so we can
+    store it on PhoneNumber.monthly_cost at purchase time.
     """
     resp = requests.get(
         f"{TELNYX_API_BASE}/available_phone_numbers",
         headers=_telnyx_headers(),
         params={
-            "filter[phone_number][starts_with]": f"+1{area_code}",
+            "filter[country_code]": "US",
+            "filter[national_destination_code]": area_code,
             "filter[limit]": limit,
             "filter[best_effort]": "true",
         },
