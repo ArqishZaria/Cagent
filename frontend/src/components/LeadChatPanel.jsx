@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Ban, DollarSign, Send } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowRight, Ban, DollarSign, PhoneOff, Send } from "lucide-react";
 import api from "../lib/api";
 
 const STATUS_COLORS = {
@@ -46,7 +47,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || lead.do_not_contact) return;
+    if (!text || lead.do_not_contact || !fromNumber) return;
     setSending(true);
     setError("");
     try {
@@ -116,11 +117,21 @@ export default function LeadChatPanel({ lead, fromNumber }) {
         ))}
       </div>
 
-      {/* Conditional send box — hidden entirely, not just disabled, when opted out */}
+      {/* Conditional send box — hidden entirely, not just disabled, whenever
+          the message genuinely can't go out, rather than leaving an active
+          input that silently fails against the backend's own hard-block. */}
       {lead.do_not_contact ? (
         <div className="flex items-center gap-2 px-5 py-4 border-t border-paper-200 bg-alert/5 text-xs text-alert">
           <Ban size={14} />
           This lead replied STOP and can no longer be texted.
+        </div>
+      ) : !fromNumber ? (
+        <div className="flex items-center gap-2 px-5 py-4 border-t border-paper-200 bg-amber/[0.06] text-xs text-ink-700">
+          <PhoneOff size={14} className="text-amber-dim shrink-0" />
+          <span className="flex-1">No phone number connected — texting needs one to send from.</span>
+          <Link to="/app/settings" className="inline-flex items-center gap-1 text-amber-dim font-medium shrink-0 hover:underline">
+            Add one <ArrowRight size={12} />
+          </Link>
         </div>
       ) : (
         <div className="p-4 border-t border-paper-200">

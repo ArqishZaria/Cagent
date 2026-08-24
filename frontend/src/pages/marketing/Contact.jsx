@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CheckCircle2, Mail } from "lucide-react";
 import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
+import AnnouncementBanner from "../../components/marketing/AnnouncementBanner";
 
 /**
  * ContactPage
@@ -31,6 +32,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-paper-50">
+      <AnnouncementBanner />
       <PublicNav />
 
       <section className="max-w-3xl mx-auto px-6 pt-24 pb-24">

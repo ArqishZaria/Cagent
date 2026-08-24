@@ -2,16 +2,18 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
+import AnnouncementBanner from "../../components/marketing/AnnouncementBanner";
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-paper-50">
+      <AnnouncementBanner />
       <PublicNav />
 
       <section className="max-w-4xl mx-auto px-6 pt-24 pb-16">
         <span className="label-eyebrow inline-block mb-5">About cagent</span>
-        <h1 className="font-display text-4xl sm:text-5xl font-semibold mb-6 leading-tight text-ink-900">
-          Built by people tired of switching tabs to talk to a customer.
+        <h1 className="font-voice text-5xl sm:text-6xl mb-6 leading-[1.05] text-ink-900">
+          Built by people tired of switching tabs to talk to a <em className="italic text-signal">customer</em>.
         </h1>
         <p className="text-ink-600 text-lg leading-relaxed max-w-2xl">
           Most sales teams run their phone system, their CRM, and their lead lists in three

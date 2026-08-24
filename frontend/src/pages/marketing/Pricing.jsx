@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Check } from "lucide-react";
 import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
+import AnnouncementBanner from "../../components/marketing/AnnouncementBanner";
 
 const TIERS = [
   {
@@ -38,6 +39,7 @@ const TIERS = [
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-paper-50">
+      <AnnouncementBanner />
       <PublicNav />
 
       <section className="max-w-6xl mx-auto px-6 pt-24 pb-24">

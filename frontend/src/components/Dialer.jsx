@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { TelnyxRTCContext, useNotification } from "@telnyx/react-client";
-import { Mic, MicOff, Phone, PhoneOff } from "lucide-react";
+import { ArrowRight, Mic, MicOff, Phone, PhoneOff } from "lucide-react";
 import SignalBars from "./SignalBars";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
@@ -11,7 +12,7 @@ const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
  * drives calls through it directly, per @telnyx/react-client's documented
  * pattern of using the context client rather than a second client instance.
  */
-export default function Dialer({ activeLead, onSaveNote }) {
+export default function Dialer({ activeLead, onSaveNote, fromNumber }) {
   const client = useContext(TelnyxRTCContext);
   const notification = useNotification();
   const activeCall = notification?.call;
@@ -69,6 +70,15 @@ export default function Dialer({ activeLead, onSaveNote }) {
           </span>
         )}
       </div>
+
+      {!fromNumber && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber/25 bg-amber/[0.06] px-3 py-2.5 mb-2 text-xs text-ink-700">
+          <span className="flex-1">No caller ID connected yet — outbound calls won't show your business number.</span>
+          <Link to="/app/settings" className="inline-flex items-center gap-1 text-amber-dim font-medium shrink-0 hover:underline">
+            Buy a number <ArrowRight size={12} />
+          </Link>
+        </div>
+      )}
 
       {/* Active-call visualizer — the signature signal-bars motif, doing
           real work here as a live-audio indicator rather than decoration. */}

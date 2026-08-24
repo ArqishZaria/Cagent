@@ -57,6 +57,12 @@ export default {
       },
       fontFamily: {
         display: ["'Fraunces'", "ui-serif", "Georgia", "serif"],
+        // "voice" — reserved for the one or two biggest, most human lines on
+        // a page (hero headline, pull-quotes). Instrument Serif is a
+        // one-weight, italic-forward editorial face; using it sparingly
+        // next to the workhorse Fraunces/Plex pairing is what keeps big
+        // type feeling written rather than templated.
+        voice: ["'Instrument Serif'", "ui-serif", "Georgia", "serif"],
         body: ["'IBM Plex Sans'", "system-ui", "sans-serif"],
         mono: ["'IBM Plex Mono'", "monospace"],
       },
@@ -87,12 +93,34 @@ export default {
           "0%": { opacity: "0", transform: "translateX(-6px)" },
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
+        // Slow ambient drift for the hero's living background — subtle
+        // enough to feel alive without competing with the ledger mockup.
+        "drift-a": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(40px, -30px) scale(1.08)" },
+        },
+        "drift-b": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(-35px, 30px) scale(0.94)" },
+        },
+        "drift-c": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(20px, 35px) scale(1.05)" },
+        },
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         "signal-bar": "signal-bar 1s ease-in-out infinite",
         "pulse-ring": "pulse-ring 1.8s cubic-bezier(0.4,0,0.6,1) infinite",
         "fade-up": "fade-up 0.4s ease-out",
         "ledger-in": "ledger-in 0.35s ease-out backwards",
+        "drift-a": "drift-a 16s ease-in-out infinite",
+        "drift-b": "drift-b 19s ease-in-out infinite",
+        "drift-c": "drift-c 22s ease-in-out infinite",
+        marquee: "marquee 28s linear infinite",
       },
     },
   },

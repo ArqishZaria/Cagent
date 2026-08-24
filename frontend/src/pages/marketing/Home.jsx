@@ -1,24 +1,32 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, MessageSquareText, PhoneCall, Sparkles } from "lucide-react";
+import { ArrowRight, MessageSquareText, PhoneCall, Sparkles, TrendingUp } from "lucide-react";
 import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
+import AnnouncementBanner from "../../components/marketing/AnnouncementBanner";
+import AmbientBackdrop from "../../components/marketing/AmbientBackdrop";
 import LedgerMockup from "../../components/marketing/LedgerMockup";
+import TrustStrip from "../../components/marketing/TrustStrip";
+import Testimonials from "../../components/marketing/Testimonials";
 import Reveal from "../../components/marketing/Reveal";
 
 export default function MarketingHome() {
   return (
     <div className="min-h-screen bg-paper-50">
+      <AnnouncementBanner />
       <PublicNav />
 
       {/* Hero — the ledger mockup is a literal picture of the product: real
-          calls and leads, logged in rows, as they happen. */}
+          calls and leads, logged in rows, as they happen. The ambient
+          backdrop is the "this is alive" layer: three color fields drift
+          slowly behind the copy, quiet enough to sit behind body text. */}
       <section className="relative overflow-hidden border-b border-paper-200">
-        <div className="max-w-6xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-2 gap-16 items-center">
+        <AmbientBackdrop />
+        <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-2 gap-16 items-center">
           <div>
-            <span className="label-eyebrow inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full border border-paper-300 bg-white">
+            <span className="label-eyebrow inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full border border-paper-300 bg-white/80 backdrop-blur">
               Phone system · CRM · AI lead generation
             </span>
-            <h1 className="font-display text-4xl sm:text-5xl font-semibold leading-[1.08] tracking-tight mb-6 text-ink-900">
+            <h1 className="font-voice text-5xl sm:text-6xl leading-[1.05] tracking-tight mb-6 text-ink-900">
               Every call is a lead.
               <br />
               Every lead is <em className="italic text-signal">one number</em> away.
@@ -33,15 +41,30 @@ export default function MarketingHome() {
               <Link to="/contact" className="btn-primary !px-6 !py-3 text-sm">
                 Start free <ArrowRight size={16} />
               </Link>
-              <Link to="/pricing" className="btn-secondary !px-6 !py-3 text-sm">
+              <Link to="/pricing" className="btn-secondary !px-6 !py-3 text-sm bg-white/80 backdrop-blur">
                 See pricing
               </Link>
             </div>
           </div>
 
-          <LedgerMockup className="max-w-md mx-auto lg:mx-0 lg:ml-auto w-full" />
+          <div className="relative max-w-md mx-auto lg:mx-0 lg:ml-auto w-full">
+            <LedgerMockup />
+            {/* Floating stat chip — a second, smaller living element: a real
+                number the product would actually surface, not a decoration. */}
+            <div className="hidden sm:flex absolute -bottom-6 -left-8 items-center gap-2.5 bg-white border border-paper-200 rounded-xl shadow-raised-lg px-4 py-3 animate-fade-up">
+              <span className="w-8 h-8 rounded-lg bg-live/10 text-live flex items-center justify-center shrink-0">
+                <TrendingUp size={16} />
+              </span>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold text-ink-900 font-mono">+32%</p>
+                <p className="text-[11px] text-ink-500">leads worked this week</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
+
+      <TrustStrip />
 
       {/* Feature trio */}
       <section className="max-w-6xl mx-auto px-6 py-24">
@@ -96,10 +119,12 @@ export default function MarketingHome() {
         </div>
       </section>
 
+      <Testimonials />
+
       <Reveal>
-        <section className="max-w-4xl mx-auto px-6 py-24 text-center">
-          <h2 className="font-display text-3xl sm:text-4xl font-semibold mb-5 text-ink-900">
-            Give your team a phone that already knows the customer.
+        <section className="relative max-w-4xl mx-auto px-6 py-24 text-center overflow-hidden">
+          <h2 className="font-voice text-4xl sm:text-5xl mb-5 text-ink-900">
+            Give your team a phone that already <em className="italic text-signal">knows</em> the customer.
           </h2>
           <p className="text-ink-500 mb-8">No setup fees. No contracts. Cancel any time.</p>
           <Link to="/contact" className="btn-primary !px-7 !py-3.5 text-sm inline-flex">
