@@ -68,15 +68,15 @@ export default function LeadsPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="border-b border-ink-500/50 bg-ink-800/60 backdrop-blur">
+      <div className="border-b border-paper-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-8 flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-live/15 border border-live/30 text-live">
+          <div className="p-3 rounded-xl bg-signal/8 border border-signal/25 text-signal">
             <ClipboardList size={22} />
           </div>
           <div>
             <span className="label-eyebrow">Your lead database</span>
-            <h1 className="text-2xl font-display font-semibold">
-              Leads {count ? <span className="text-ink-300 font-normal text-lg">({count})</span> : null}
+            <h1 className="text-2xl font-display font-semibold text-ink-900">
+              Leads {count ? <span className="text-ink-400 font-normal text-lg">({count})</span> : null}
             </h1>
           </div>
         </div>
@@ -85,7 +85,7 @@ export default function LeadsPage() {
       <div className="max-w-6xl mx-auto px-6 py-8">
         <form onSubmit={submitSearch} className="flex gap-2 mb-8">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-300" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
             <input
               className="input-field !pl-10"
               placeholder="Search by company, city, state, name, email, or phone…"
@@ -100,11 +100,11 @@ export default function LeadsPage() {
 
         {loading ? (
           <div className="flex justify-center py-20">
-            <Loader2 className="animate-spin text-ink-300" size={22} />
+            <Loader2 className="animate-spin text-ink-400" size={22} />
           </div>
         ) : leads.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-ink-500/50 rounded-2xl">
-            <p className="text-ink-200 text-sm">
+          <div className="text-center py-16 border border-dashed border-paper-300 rounded-2xl bg-white">
+            <p className="text-ink-500 text-sm">
               No leads yet. Find some in the Prospector, or upload a list of your own.
             </p>
           </div>
@@ -118,7 +118,7 @@ export default function LeadsPage() {
 
             {nextUrl && (
               <div className="flex justify-center mt-8">
-                <button onClick={loadMore} disabled={loadingMore} className="btn-ghost !px-6 !py-2.5 text-sm">
+                <button onClick={loadMore} disabled={loadingMore} className="btn-secondary !px-6 !py-2.5 text-sm">
                   {loadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
                   Load more
                 </button>

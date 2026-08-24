@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { KeyRound, Mail } from "lucide-react";
-import SignalBars from "../components/SignalBars";
 
 /**
  * ForgotPasswordPage — UI shell for now. The actual "email a reset link"
@@ -25,27 +24,27 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ink-900 px-6">
+    <div className="min-h-screen flex items-center justify-center bg-paper-50 px-6">
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2.5 justify-center mb-8">
-          <SignalBars bars={4} size="sm" color="signal" />
-          <span className="font-display font-semibold text-xl">cagent</span>
+        <div className="flex items-center gap-2 justify-center mb-8">
+          <span className="w-2 h-2 rounded-full bg-signal" />
+          <span className="font-display font-semibold text-xl text-ink-900">cagent</span>
         </div>
 
-        <div className="card p-8">
+        <div className="card-raised p-8">
           <div className="flex items-center gap-2 mb-2">
-            <KeyRound size={18} className="text-signal-bright" />
-            <h1 className="text-lg font-display font-semibold">Reset your password</h1>
+            <KeyRound size={18} className="text-signal" />
+            <h1 className="text-lg font-display font-semibold text-ink-900">Reset your password</h1>
           </div>
 
           {submitted ? (
-            <p className="text-sm text-ink-200 mt-4">
-              If an account exists for <span className="text-ink-50">{email}</span>, a reset
+            <p className="text-sm text-ink-600 mt-4">
+              If an account exists for <span className="text-ink-900">{email}</span>, a reset
               link is on its way.
             </p>
           ) : (
             <>
-              <p className="text-sm text-ink-300 mb-5 mt-2">
+              <p className="text-sm text-ink-500 mb-5 mt-2">
                 Enter your email and we'll send you a link to set a new password.
               </p>
               <form onSubmit={submit}>
@@ -67,8 +66,8 @@ export default function ForgotPasswordPage() {
           )}
         </div>
 
-        <p className="text-center text-xs text-ink-300 mt-6">
-          <Link to="/login" className="hover:text-ink-100 transition">
+        <p className="text-center text-xs text-ink-500 mt-6">
+          <Link to="/login" className="hover:text-ink-900 transition">
             &larr; Back to sign in
           </Link>
         </p>

@@ -3,11 +3,11 @@ import { Ban, DollarSign, Send } from "lucide-react";
 import api from "../lib/api";
 
 const STATUS_COLORS = {
-  NEW: "bg-signal/15 text-signal-bright border-signal/30",
-  CONTACTED: "bg-amber/15 text-amber border-amber/30",
-  QUALIFIED: "bg-live/15 text-live border-live/30",
-  WON: "bg-live/20 text-live border-live/40",
-  LOST: "bg-ink-500/20 text-ink-200 border-ink-500/40",
+  NEW: "bg-ink-100 text-ink-700 border-ink-200",
+  CONTACTED: "bg-amber/10 text-amber-dim border-amber/25",
+  QUALIFIED: "bg-signal/10 text-signal border-signal/25",
+  WON: "bg-live/10 text-live border-live/25",
+  LOST: "bg-alert/10 text-alert border-alert/25",
 };
 
 /**
@@ -38,7 +38,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
 
   if (!lead) {
     return (
-      <div className="card h-full flex items-center justify-center text-sm text-ink-300">
+      <div className="card h-full flex items-center justify-center text-sm text-ink-500">
         Select a lead to view their profile and conversation.
       </div>
     );
@@ -70,13 +70,13 @@ export default function LeadChatPanel({ lead, fromNumber }) {
   return (
     <div className="card h-full flex flex-col overflow-hidden">
       {/* Lead profile */}
-      <div className="p-5 border-b border-ink-500/50">
+      <div className="p-5 border-b border-paper-200">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h2 className="font-display font-semibold text-lg">
+            <h2 className="font-display font-semibold text-lg text-ink-900">
               {lead.first_name} {lead.last_name}
             </h2>
-            <p className="text-xs text-ink-300">
+            <p className="text-xs text-ink-500">
               {lead.job_title ? `${lead.job_title} · ` : ""}
               {lead.company}
             </p>
@@ -86,9 +86,9 @@ export default function LeadChatPanel({ lead, fromNumber }) {
           </span>
         </div>
         <div className="flex items-center gap-4 text-xs">
-          <span className="font-mono text-ink-100">{lead.phone_number}</span>
+          <span className="font-mono text-ink-800">{lead.phone_number}</span>
           {lead.deal_value && (
-            <span className="flex items-center gap-1 font-mono text-amber">
+            <span className="flex items-center gap-1 font-mono text-amber-dim">
               <DollarSign size={12} />
               {Number(lead.deal_value).toLocaleString()}
             </span>
@@ -102,13 +102,13 @@ export default function LeadChatPanel({ lead, fromNumber }) {
       </div>
 
       {/* SMS thread */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3">
-        {messages.length === 0 && <p className="text-xs text-ink-300">No messages yet.</p>}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3 bg-paper-50/60">
+        {messages.length === 0 && <p className="text-xs text-ink-400">No messages yet.</p>}
         {messages.map((m) => (
           <div
             key={m.id}
             className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-              m.direction === "OUTBOUND" ? "bg-signal text-white ml-auto" : "bg-ink-600 text-ink-50 mr-auto"
+              m.direction === "OUTBOUND" ? "bg-signal text-white ml-auto" : "bg-white border border-paper-200 text-ink-800 mr-auto"
             }`}
           >
             {m.message_body}
@@ -118,12 +118,12 @@ export default function LeadChatPanel({ lead, fromNumber }) {
 
       {/* Conditional send box — hidden entirely, not just disabled, when opted out */}
       {lead.do_not_contact ? (
-        <div className="flex items-center gap-2 px-5 py-4 border-t border-ink-500/50 bg-alert/5 text-xs text-alert">
+        <div className="flex items-center gap-2 px-5 py-4 border-t border-paper-200 bg-alert/5 text-xs text-alert">
           <Ban size={14} />
           This lead replied STOP and can no longer be texted.
         </div>
       ) : (
-        <div className="p-4 border-t border-ink-500/50">
+        <div className="p-4 border-t border-paper-200">
           {error && <p className="text-xs text-alert mb-2">{error}</p>}
           <div className="flex items-center gap-2">
             <input

@@ -37,16 +37,16 @@ const TIERS = [
 
 export default function PricingPage() {
   return (
-    <div className="min-h-screen bg-ink-900">
+    <div className="min-h-screen bg-paper-50">
       <PublicNav />
 
       <section className="max-w-6xl mx-auto px-6 pt-24 pb-24">
         <div className="text-center mb-16">
           <span className="label-eyebrow inline-block mb-5">Pricing</span>
-          <h1 className="font-display text-4xl sm:text-5xl font-semibold mb-4">
+          <h1 className="font-display text-4xl sm:text-5xl font-semibold mb-4 text-ink-900">
             Simple pricing, no surprises.
           </h1>
-          <p className="text-ink-200">Start free. Upgrade when your team is actually using it.</p>
+          <p className="text-ink-600">Start free. Upgrade when your team is actually using it.</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -54,23 +54,23 @@ export default function PricingPage() {
             <div
               key={tier.name}
               className={`card p-7 flex flex-col ${
-                tier.highlighted ? "border-amber/50 shadow-glow relative" : ""
+                tier.highlighted ? "border-2 !border-amber relative shadow-raised-lg" : ""
               }`}
             >
               {tier.highlighted && (
-                <span className="absolute -top-3 left-7 label-eyebrow px-3 py-1 rounded-full bg-amber text-ink-950">
+                <span className="absolute -top-3 left-7 label-eyebrow px-3 py-1 rounded-full bg-amber text-white">
                   Most popular
                 </span>
               )}
-              <h3 className="font-display text-xl font-semibold mb-1">{tier.name}</h3>
-              <p className="text-sm text-ink-300 mb-5">{tier.description}</p>
+              <h3 className="font-display text-xl font-semibold mb-1 text-ink-900">{tier.name}</h3>
+              <p className="text-sm text-ink-500 mb-5">{tier.description}</p>
               <div className="flex items-baseline gap-1 mb-6">
-                <span className="font-display text-4xl font-semibold">{tier.price}</span>
-                <span className="text-sm text-ink-300">{tier.period}</span>
+                <span className="font-display text-4xl font-semibold text-ink-900">{tier.price}</span>
+                <span className="text-sm text-ink-500">{tier.period}</span>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
                 {tier.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-ink-100">
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-ink-700">
                     <Check size={16} className="text-live shrink-0 mt-0.5" />
                     {f}
                   </li>

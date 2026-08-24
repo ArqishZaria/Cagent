@@ -109,14 +109,14 @@ export default function AgenticProspectorPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="border-b border-ink-500/50 bg-ink-800/60 backdrop-blur">
+      <div className="border-b border-paper-200 bg-white">
         <div className="max-w-5xl mx-auto px-6 py-8 flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-amber/15 border border-amber/30 text-amber">
+          <div className="p-3 rounded-xl bg-amber/8 border border-amber/25 text-amber-dim">
             <Sparkles size={22} />
           </div>
           <div>
             <span className="label-eyebrow">AI-powered lead generation</span>
-            <h1 className="text-2xl font-display font-semibold">The Prospector</h1>
+            <h1 className="text-2xl font-display font-semibold text-ink-900">The Prospector</h1>
           </div>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function AgenticProspectorPage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         <form onSubmit={search} className="flex gap-2 mb-2">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-300" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
             <input
               className="input-field !pl-10"
               placeholder="e.g. roofing contractors in Austin, TX"
@@ -137,10 +137,10 @@ export default function AgenticProspectorPage() {
             Prospect
           </button>
         </form>
-        <p className="text-[11px] text-ink-300 mb-8">Max 5 fresh web searches per hour.</p>
+        <p className="text-[11px] text-ink-400 mb-8">Max 5 fresh web searches per hour.</p>
 
         {error && (
-          <div className="flex items-start gap-2 rounded-xl border border-alert/30 bg-alert/10 px-4 py-3 mb-8 text-sm text-alert">
+          <div className="flex items-start gap-2 rounded-xl border border-alert/25 bg-alert/5 px-4 py-3 mb-8 text-sm text-alert">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -150,9 +150,9 @@ export default function AgenticProspectorPage() {
         {existingSearched && existingLeads.length > 0 && (
           <section className="mb-10">
             <div className="flex items-center gap-2 mb-4">
-              <Database size={15} className="text-signal-bright" />
-              <h2 className="font-display font-semibold text-sm">
-                From your database <span className="text-ink-300 font-normal">({existingLeads.length})</span>
+              <Database size={15} className="text-signal" />
+              <h2 className="font-display font-semibold text-sm text-ink-900">
+                From your database <span className="text-ink-400 font-normal">({existingLeads.length})</span>
               </h2>
             </div>
             <LeadsGrid leads={existingLeads} onContact={contactLead} />
@@ -163,7 +163,7 @@ export default function AgenticProspectorPage() {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Globe size={15} className="text-live" />
-            <h2 className="font-display font-semibold text-sm">New from the web</h2>
+            <h2 className="font-display font-semibold text-sm text-ink-900">New from the web</h2>
           </div>
 
           {isScraping && <ScrapingState />}
@@ -171,7 +171,7 @@ export default function AgenticProspectorPage() {
           {!isScraping && newLeads.length > 0 && <LeadsGrid leads={newLeads} onContact={contactLead} />}
 
           {!isScraping && task?.status === "COMPLETED" && newLeads.length === 0 && (
-            <p className="text-sm text-ink-300 text-center py-12">
+            <p className="text-sm text-ink-500 text-center py-12">
               No new leads found beyond what's already in your database. Try broadening the query.
             </p>
           )}
@@ -187,15 +187,15 @@ function ScrapingState() {
   return (
     <div className="flex flex-col items-center justify-center py-16 gap-5 animate-fade-up">
       <SignalBars bars={9} size="lg" color="amber" />
-      <p className="font-display text-lg">Searching and qualifying leads…</p>
+      <p className="font-display text-lg text-ink-900">Searching and qualifying leads…</p>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="text-center py-16 border border-dashed border-ink-500/50 rounded-2xl">
-      <p className="text-ink-200 text-sm">
+    <div className="text-center py-16 border border-dashed border-paper-300 rounded-2xl bg-white">
+      <p className="text-ink-500 text-sm">
         Describe who you're looking for — industry, city, role — and cagent will find and
         extract contacts for you.
       </p>

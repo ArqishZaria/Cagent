@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
-import SignalBars from "../components/SignalBars";
 import api from "../lib/api";
 
 /**
@@ -34,17 +33,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ink-900 px-6">
+    <div className="min-h-screen flex items-center justify-center bg-paper-50 px-6">
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2.5 justify-center mb-8">
-          <SignalBars bars={4} size="sm" color="signal" />
-          <span className="font-display font-semibold text-xl">cagent</span>
+        <div className="flex items-center gap-2 justify-center mb-8">
+          <span className="w-2 h-2 rounded-full bg-signal" />
+          <span className="font-display font-semibold text-xl text-ink-900">cagent</span>
         </div>
 
-        <form onSubmit={submit} className="card p-8">
+        <form onSubmit={submit} className="card-raised p-8">
           <div className="flex items-center gap-2 mb-6">
-            <LogIn size={18} className="text-signal-bright" />
-            <h1 className="text-lg font-display font-semibold">Sign in</h1>
+            <LogIn size={18} className="text-signal" />
+            <h1 className="text-lg font-display font-semibold text-ink-900">Sign in</h1>
           </div>
 
           <label className="label-eyebrow block mb-1.5">Username</label>
@@ -57,7 +56,7 @@ export default function LoginPage() {
 
           <div className="flex items-center justify-between mb-1.5">
             <label className="label-eyebrow">Password</label>
-            <Link to="/forgot-password" className="text-xs text-signal-bright hover:underline">
+            <Link to="/forgot-password" className="text-xs text-signal hover:underline">
               Forgot password?
             </Link>
           </div>
@@ -75,8 +74,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-ink-300 mt-6">
-          <Link to="/" className="hover:text-ink-100 transition">
+        <p className="text-center text-xs text-ink-500 mt-6">
+          <Link to="/" className="hover:text-ink-900 transition">
             &larr; Back to cagent
           </Link>
         </p>

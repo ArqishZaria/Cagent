@@ -62,7 +62,7 @@ export default function Dialer({ activeLead, onSaveNote }) {
         {callState && (
           <span
             className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
-              callState === "active" ? "bg-live/15 text-live" : "bg-amber/15 text-amber"
+              callState === "active" ? "bg-live/10 text-live" : "bg-amber/10 text-amber-dim"
             }`}
           >
             {callState}
@@ -74,11 +74,11 @@ export default function Dialer({ activeLead, onSaveNote }) {
           real work here as a live-audio indicator rather than decoration. */}
       <div className="flex flex-col items-center justify-center py-6">
         <SignalBars bars={7} size="lg" color={callState === "active" ? "live" : "signal"} active={inCall} />
-        <p className="font-mono text-2xl mt-4 text-ink-50">
+        <p className="font-mono text-2xl mt-4 text-ink-900">
           {callState === "active" ? formatTime(elapsed) : digits || activeLead?.phone_number || "—"}
         </p>
         {activeLead && (
-          <p className="text-xs text-ink-300 mt-1">
+          <p className="text-xs text-ink-500 mt-1">
             {activeLead.first_name} {activeLead.last_name}
           </p>
         )}
@@ -91,10 +91,10 @@ export default function Dialer({ activeLead, onSaveNote }) {
             key={key}
             onClick={() => press(key)}
             disabled={inCall}
-            className="aspect-square rounded-2xl bg-ink-600 border border-ink-500/60
+            className="aspect-square rounded-xl bg-white border border-paper-300
                        shadow-key active:shadow-key-active active:translate-y-[2px]
-                       text-lg font-display font-medium text-ink-50
-                       hover:bg-ink-500/60 transition disabled:opacity-30 disabled:pointer-events-none"
+                       text-lg font-display font-medium text-ink-900
+                       hover:bg-paper-100 transition disabled:opacity-30 disabled:pointer-events-none"
           >
             {key}
           </button>
@@ -116,15 +116,15 @@ export default function Dialer({ activeLead, onSaveNote }) {
           <>
             <button
               onClick={toggleMute}
-              className="btn-ghost !rounded-full !p-3.5"
+              className="btn-secondary !rounded-full !p-3.5"
               aria-label={muted ? "Unmute" : "Mute"}
             >
               {muted ? <MicOff size={18} /> : <Mic size={18} />}
             </button>
             <button
               onClick={hangup}
-              className="!rounded-full !p-4 bg-gradient-to-b from-alert to-alert-dim text-white
-                         shadow-raised-lg border border-alert/40 hover:brightness-110 transition"
+              className="!rounded-full !p-4 bg-alert text-white
+                         shadow-raised-lg border border-alert-dim/40 hover:bg-alert-dim transition"
               aria-label="Hang up"
             >
               <PhoneOff size={20} />
@@ -134,7 +134,7 @@ export default function Dialer({ activeLead, onSaveNote }) {
       </div>
 
       {/* Call notes */}
-      <div className="mt-auto pt-4 border-t border-ink-500/50">
+      <div className="mt-auto pt-4 border-t border-paper-200">
         <label className="label-eyebrow block mb-2">Call notes</label>
         <textarea
           className="input-field !text-sm resize-none h-20"

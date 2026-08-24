@@ -34,7 +34,7 @@ export default function SignalBars({
             height: "100%",
             animationDelay: `${i * 0.12}s`,
             transform: active ? undefined : "scaleY(0.35)",
-            opacity: active ? 1 : 0.35,
+            opacity: active ? 1 : 0.3,
           }}
         />
       ))}

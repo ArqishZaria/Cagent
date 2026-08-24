@@ -1,16 +1,15 @@
 import { Link } from "react-router-dom";
-import SignalBars from "../SignalBars";
 
 export default function PublicFooter() {
   return (
-    <footer className="border-t border-ink-500/40 bg-ink-950">
+    <footer className="border-t border-paper-200 bg-white">
       <div className="max-w-7xl mx-auto px-6 py-14 grid sm:grid-cols-2 md:grid-cols-4 gap-10">
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <SignalBars bars={4} size="sm" color="signal" active={false} />
-            <span className="font-display font-semibold text-lg">cagent</span>
+            <span className="w-2 h-2 rounded-full bg-signal" />
+            <span className="font-display font-semibold text-lg text-ink-900">cagent</span>
           </div>
-          <p className="text-sm text-ink-300 leading-relaxed max-w-xs">
+          <p className="text-sm text-ink-500 leading-relaxed max-w-xs">
             One phone system, one CRM, one place your leads actually get worked.
           </p>
         </div>
@@ -34,8 +33,8 @@ export default function PublicFooter() {
           links={[{ to: "/contact", label: "Start free" }]}
         />
       </div>
-      <div className="border-t border-ink-500/30 py-6">
-        <p className="text-center text-xs text-ink-300 font-mono">
+      <div className="border-t border-paper-200 py-6">
+        <p className="text-center text-xs text-ink-400 font-mono">
           © {new Date().getFullYear()} cagent. All rights reserved.
         </p>
       </div>
@@ -52,7 +51,7 @@ function FooterColumn({ title, links }) {
           <Link
             key={link.to}
             to={link.to}
-            className="block text-sm text-ink-200 hover:text-signal-bright transition"
+            className="block text-sm text-ink-600 hover:text-signal transition"
           >
             {link.label}
           </Link>

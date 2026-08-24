@@ -1,11 +1,11 @@
 import { Building2, DollarSign, Mail, MapPin, MessageSquareText, Phone } from "lucide-react";
 
 const STATUS_COLORS = {
-  NEW: "bg-signal/15 text-signal-bright border-signal/30",
-  CONTACTED: "bg-amber/15 text-amber border-amber/30",
-  QUALIFIED: "bg-live/15 text-live border-live/30",
-  WON: "bg-live/20 text-live border-live/40",
-  LOST: "bg-ink-500/20 text-ink-200 border-ink-500/40",
+  NEW: "bg-ink-100 text-ink-700 border-ink-200",
+  CONTACTED: "bg-amber/10 text-amber-dim border-amber/25",
+  QUALIFIED: "bg-signal/10 text-signal border-signal/25",
+  WON: "bg-live/10 text-live border-live/25",
+  LOST: "bg-alert/10 text-alert border-alert/25",
 };
 
 /**
@@ -30,18 +30,18 @@ export default function LeadListItem({ lead, compact = false, active = false, on
     return (
       <button
         onClick={onSelect}
-        className={`w-full text-left rounded-xl px-3.5 py-3 transition ${
-          active ? "bg-signal/15 border border-signal/40" : "hover:bg-ink-600/60 border border-transparent"
+        className={`w-full text-left rounded-lg px-3.5 py-3 transition ${
+          active ? "bg-signal/8 border border-signal/30" : "hover:bg-paper-100 border border-transparent"
         }`}
       >
-        <p className="text-sm font-medium text-ink-50 truncate">{name}</p>
-        <p className="text-[11px] text-ink-300 truncate">{lead.company}</p>
+        <p className="text-sm font-medium text-ink-900 truncate">{name}</p>
+        <p className="text-[11px] text-ink-500 truncate">{lead.company}</p>
         <div className="flex items-center justify-between mt-1.5">
           <span className={`text-[10px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded border ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
             {lead.status || "NEW"}
           </span>
           {lead.deal_value ? (
-            <span className="text-[10px] font-mono text-amber">${Number(lead.deal_value).toLocaleString()}</span>
+            <span className="text-[10px] font-mono text-amber-dim">${Number(lead.deal_value).toLocaleString()}</span>
           ) : null}
         </div>
       </button>
@@ -49,12 +49,12 @@ export default function LeadListItem({ lead, compact = false, active = false, on
   }
 
   return (
-    <div className="card p-4 flex flex-col gap-3">
+    <div className="card p-4 flex flex-col gap-3 hover:border-ink-200 transition-colors">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-display font-semibold text-sm truncate">{name}</p>
+          <p className="font-display font-semibold text-sm text-ink-900 truncate">{name}</p>
           {lead.company && (
-            <p className="flex items-center gap-1.5 text-xs text-ink-200 mt-0.5 truncate">
+            <p className="flex items-center gap-1.5 text-xs text-ink-600 mt-0.5 truncate">
               <Building2 size={12} className="shrink-0" /> {lead.company}
             </p>
           )}
@@ -66,24 +66,24 @@ export default function LeadListItem({ lead, compact = false, active = false, on
         )}
       </div>
 
-      <div className="space-y-1.5 pt-2 border-t border-ink-500/40">
+      <div className="space-y-1.5 pt-2 border-t border-paper-200">
         {location && (
-          <p className="flex items-center gap-1.5 text-xs text-ink-200">
-            <MapPin size={12} className="shrink-0 text-ink-300" /> {location}
+          <p className="flex items-center gap-1.5 text-xs text-ink-600">
+            <MapPin size={12} className="shrink-0 text-ink-400" /> {location}
           </p>
         )}
         {lead.phone_number && (
-          <p className="flex items-center gap-1.5 text-xs font-mono text-ink-100">
-            <Phone size={12} className="shrink-0 text-ink-300" /> {lead.phone_number}
+          <p className="flex items-center gap-1.5 text-xs font-mono text-ink-800">
+            <Phone size={12} className="shrink-0 text-ink-400" /> {lead.phone_number}
           </p>
         )}
         {lead.email && (
-          <p className="flex items-center gap-1.5 text-xs font-mono text-ink-100 truncate">
-            <Mail size={12} className="shrink-0 text-ink-300" /> {lead.email}
+          <p className="flex items-center gap-1.5 text-xs font-mono text-ink-800 truncate">
+            <Mail size={12} className="shrink-0 text-ink-400" /> {lead.email}
           </p>
         )}
         {lead.deal_value ? (
-          <p className="flex items-center gap-1.5 text-xs font-mono text-amber">
+          <p className="flex items-center gap-1.5 text-xs font-mono text-amber-dim">
             <DollarSign size={12} className="shrink-0" /> {Number(lead.deal_value).toLocaleString()}
           </p>
         ) : null}

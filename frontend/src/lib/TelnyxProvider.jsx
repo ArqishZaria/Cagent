@@ -41,7 +41,7 @@ export default function AppTelnyxProvider({ children }) {
   }
 
   if (!loginToken) {
-    return <div className="text-xs text-ink-300 font-mono px-4 py-2">Connecting phone…</div>;
+    return <div className="text-xs text-ink-500 font-mono px-4 py-2">Connecting phone…</div>;
   }
 
   const credential = { login_token: loginToken };

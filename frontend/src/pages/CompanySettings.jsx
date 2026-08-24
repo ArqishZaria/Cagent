@@ -36,14 +36,14 @@ export default function CompanySettingsPage() {
 
 function PageHeader() {
   return (
-    <div className="border-b border-ink-500/50 bg-ink-800/60 backdrop-blur">
+    <div className="border-b border-paper-200 bg-white">
       <div className="max-w-6xl mx-auto px-6 py-8 flex items-center gap-4">
-        <div className="p-3 rounded-2xl bg-signal/15 border border-signal/30 text-signal-bright">
+        <div className="p-3 rounded-xl bg-signal/8 border border-signal/25 text-signal">
           <Building2 size={22} />
         </div>
         <div>
           <span className="label-eyebrow">Company settings</span>
-          <h1 className="text-2xl font-display font-semibold">Numbers, team &amp; access</h1>
+          <h1 className="text-2xl font-display font-semibold text-ink-900">Numbers, team &amp; access</h1>
         </div>
       </div>
     </div>
@@ -102,9 +102,9 @@ function NumberPurchaseCard() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <span className="label-eyebrow">Phone numbers</span>
-          <h2 className="text-lg font-display font-semibold">Buy a Telnyx number</h2>
+          <h2 className="text-lg font-display font-semibold text-ink-900">Buy a Telnyx number</h2>
         </div>
-        <span className="font-mono text-xs text-ink-300">{owned.length} owned</span>
+        <span className="font-mono text-xs text-ink-400">{owned.length} owned</span>
       </div>
 
       <div className="flex gap-2 mb-5">
@@ -128,11 +128,11 @@ function NumberPurchaseCard() {
           {results.map((r) => (
             <div
               key={r.phone_number}
-              className="flex items-center justify-between rounded-xl bg-ink-800 border border-ink-500/50 px-4 py-3"
+              className="flex items-center justify-between rounded-lg bg-paper-50 border border-paper-200 px-4 py-3"
             >
               <div>
-                <p className="font-mono text-sm text-ink-50">{r.phone_number}</p>
-                <p className="text-[11px] text-ink-300">{r.region || r.locality || "United States"}</p>
+                <p className="font-mono text-sm text-ink-900">{r.phone_number}</p>
+                <p className="text-[11px] text-ink-400">{r.region || r.locality || "United States"}</p>
               </div>
               <button
                 onClick={() => purchase(r.phone_number)}
@@ -151,13 +151,13 @@ function NumberPurchaseCard() {
       )}
 
       {owned.length > 0 && (
-        <div className="mt-6 pt-5 border-t border-ink-500/50">
+        <div className="mt-6 pt-5 border-t border-paper-200">
           <p className="label-eyebrow mb-3">Owned numbers</p>
           <div className="grid sm:grid-cols-2 gap-2">
             {owned.map((n) => (
-              <div key={n.id} className="flex items-center gap-2 rounded-lg bg-ink-800/60 px-3 py-2">
+              <div key={n.id} className="flex items-center gap-2 rounded-lg bg-paper-50 px-3 py-2">
                 <CheckCircle2 size={14} className="text-live shrink-0" />
-                <span className="font-mono text-xs text-ink-100 truncate">{n.phone_number}</span>
+                <span className="font-mono text-xs text-ink-800 truncate">{n.phone_number}</span>
               </div>
             ))}
           </div>
@@ -207,10 +207,10 @@ function TeamCard() {
   return (
     <section className="card p-6">
       <div className="flex items-center gap-2 mb-5">
-        <Users size={18} className="text-signal-bright" />
+        <Users size={18} className="text-signal" />
         <div>
           <span className="label-eyebrow">Team</span>
-          <h2 className="text-lg font-display font-semibold">Add an agent</h2>
+          <h2 className="text-lg font-display font-semibold text-ink-900">Add an agent</h2>
         </div>
       </div>
 
@@ -227,7 +227,7 @@ function TeamCard() {
           value={form.password}
           onChange={update("password")}
         />
-        <p className="text-[11px] text-ink-300 sm:col-span-2 -mt-1">
+        <p className="text-[11px] text-ink-400 sm:col-span-2 -mt-1">
           Must be at least 8 characters, not too common, and not entirely numbers.
         </p>
         <button type="submit" disabled={submitting} className="btn-primary sm:col-span-2 mt-1">
@@ -272,21 +272,21 @@ function NumberAssignmentCard() {
   return (
     <section className="card p-6 h-fit sticky top-6">
       <div className="flex items-center gap-2 mb-5">
-        <Mail size={18} className="text-signal-bright" />
+        <Mail size={18} className="text-signal" />
         <div>
           <span className="label-eyebrow">Routing</span>
-          <h2 className="text-lg font-display font-semibold">Assign numbers</h2>
+          <h2 className="text-lg font-display font-semibold text-ink-900">Assign numbers</h2>
         </div>
       </div>
 
       {numbers.length === 0 && (
-        <p className="text-xs text-ink-300">Buy a number on the left to start assigning it to an agent.</p>
+        <p className="text-xs text-ink-400">Buy a number on the left to start assigning it to an agent.</p>
       )}
 
       <div className="space-y-3">
         {numbers.map((n) => (
-          <div key={n.id} className="rounded-xl bg-ink-800 border border-ink-500/50 p-3">
-            <p className="font-mono text-sm mb-2">{n.phone_number}</p>
+          <div key={n.id} className="rounded-lg bg-paper-50 border border-paper-200 p-3">
+            <p className="font-mono text-sm mb-2 text-ink-900">{n.phone_number}</p>
             <select
               className="input-field !py-1.5 !text-xs"
               value={n.assigned_user || ""}

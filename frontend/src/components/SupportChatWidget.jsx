@@ -65,22 +65,22 @@ export default function SupportChatWidget({ mode = "floating" }) {
     <div
       className={
         mode === "embedded"
-          ? "flex flex-col h-full"
+          ? "flex flex-col h-full bg-white"
           : "flex flex-col w-[360px] h-[480px] card-raised overflow-hidden animate-fade-up"
       }
     >
-      <div className="flex items-center justify-between px-4 py-3 border-b border-ink-500/60 bg-ink-600/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-paper-200 bg-paper-50">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-live opacity-60" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-live" />
           </span>
-          <h3 className="text-sm font-display font-semibold">Support</h3>
+          <h3 className="text-sm font-display font-semibold text-ink-900">Support</h3>
         </div>
         {mode === "floating" && (
           <button
             onClick={() => setOpen(false)}
-            className="text-ink-200 hover:text-white transition"
+            className="text-ink-400 hover:text-ink-900 transition"
             aria-label="Close support chat"
           >
             <X size={16} />
@@ -89,9 +89,9 @@ export default function SupportChatWidget({ mode = "floating" }) {
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {loading && <p className="text-xs text-ink-300 font-mono">Loading conversation…</p>}
+        {loading && <p className="text-xs text-ink-400 font-mono">Loading conversation…</p>}
         {!loading && messages.length === 0 && (
-          <p className="text-xs text-ink-300">
+          <p className="text-xs text-ink-500">
             Send us a message — a real human on the platform team will reply here.
           </p>
         )}
@@ -100,7 +100,7 @@ export default function SupportChatWidget({ mode = "floating" }) {
             key={m.id}
             className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
               m.is_from_platform_owner
-                ? "bg-ink-600 text-ink-50 self-start mr-auto"
+                ? "bg-paper-100 text-ink-800 self-start mr-auto"
                 : "bg-signal text-white ml-auto"
             }`}
           >
@@ -109,10 +109,10 @@ export default function SupportChatWidget({ mode = "floating" }) {
         ))}
       </div>
 
-      <div className="flex items-center gap-2 px-3 py-3 border-t border-ink-500/60 bg-ink-600/30">
+      <div className="flex items-center gap-2 px-3 py-3 border-t border-paper-200 bg-paper-50">
         <button
           type="button"
-          className="text-ink-300 hover:text-white transition p-1.5"
+          className="text-ink-400 hover:text-ink-900 transition p-1.5"
           title="Attach a payment receipt"
         >
           <Paperclip size={16} />

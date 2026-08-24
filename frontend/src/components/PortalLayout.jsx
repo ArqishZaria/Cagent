@@ -6,10 +6,10 @@ import PaymentOverdueOverlay from "./PaymentOverdueOverlay";
 import useIdleLogout from "../hooks/useIdleLogout";
 
 const NAV_ITEMS = [
-  { to: "/app", label: "CRM & Dialer", icon: PhoneCall },
+  { to: "/app", label: "CRM & dialer", icon: PhoneCall },
   { to: "/app/prospector", label: "Prospector", icon: Sparkles },
   { to: "/app/leads", label: "Leads", icon: ClipboardList },
-  { to: "/app/settings", label: "Company Settings", icon: Building2 },
+  { to: "/app/settings", label: "Company settings", icon: Building2 },
 ];
 
 export default function PortalLayout() {
@@ -21,9 +21,9 @@ export default function PortalLayout() {
   }, []);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-paper-50">
       <SideNav />
-      <main className="flex-1">
+      <main className="flex-1 min-w-0">
         <Outlet />
       </main>
       {overdue && <PaymentOverdueOverlay details={overdue} invoice={overdue.invoice} />}
@@ -33,9 +33,12 @@ export default function PortalLayout() {
 
 function SideNav() {
   return (
-    <nav className="w-56 shrink-0 border-r border-ink-500/50 bg-ink-800/60 backdrop-blur px-3 py-6 hidden md:flex flex-col gap-1">
-      <div className="px-3 mb-6">
-        <span className="font-display font-semibold text-lg tracking-tight">cagent</span>
+    <nav className="w-60 shrink-0 border-r border-paper-200 bg-white px-4 py-6 hidden md:flex flex-col gap-1">
+      <div className="px-2 mb-8 flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-signal" />
+        <span className="font-display font-semibold text-lg tracking-tight text-ink-900">
+          cagent
+        </span>
       </div>
       {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
         <NavLink
@@ -43,15 +46,21 @@ function SideNav() {
           to={to}
           end={to === "/app"}
           className={({ isActive }) =>
-            `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition ${
-              isActive ? "bg-signal/15 text-signal-bright border border-signal/30" : "text-ink-200 hover:bg-ink-600/60"
+            `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition ${
+              isActive
+                ? "bg-signal/10 text-signal font-medium"
+                : "text-ink-600 hover:bg-paper-100 hover:text-ink-900"
             }`
           }
         >
-          <Icon size={16} />
+          <Icon size={16} strokeWidth={2} />
           {label}
         </NavLink>
       ))}
+
+      <div className="mt-auto px-3 pt-6 border-t border-paper-200">
+        <p className="text-[11px] text-ink-400 font-mono">One phone system.<br />One ledger.</p>
+      </div>
     </nav>
   );
 }

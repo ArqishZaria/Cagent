@@ -74,29 +74,29 @@ export default function CrmDialerPage() {
 
 function PipelineHeader({ leads, pipelineValue }) {
   return (
-    <div className="border-b border-ink-500/50 bg-ink-800/60 backdrop-blur">
-      <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+    <div className="border-b border-paper-200 bg-white">
+      <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-signal/15 border border-signal/30 text-signal-bright">
+          <div className="p-3 rounded-xl bg-signal/8 border border-signal/25 text-signal">
             <PhoneCall size={22} />
           </div>
           <div>
             <span className="label-eyebrow">CRM &amp; dialer</span>
-            <h1 className="text-2xl font-display font-semibold">Pipeline</h1>
+            <h1 className="text-2xl font-display font-semibold text-ink-900">Pipeline</h1>
           </div>
         </div>
         <div className="flex items-center gap-6">
           {PIPELINE_ORDER.map((status) => (
             <div key={status} className="text-center">
-              <p className="text-[11px] font-mono text-ink-300">{status}</p>
-              <p className="font-display text-lg">{leads.filter((l) => l.status === status).length}</p>
+              <p className="text-[11px] font-mono text-ink-400">{status}</p>
+              <p className="font-display text-lg text-ink-900">{leads.filter((l) => l.status === status).length}</p>
             </div>
           ))}
-          <div className="text-center pl-4 border-l border-ink-500/50">
-            <p className="text-[11px] font-mono text-ink-300 flex items-center gap-1">
+          <div className="text-center pl-4 border-l border-paper-200">
+            <p className="text-[11px] font-mono text-ink-400 flex items-center gap-1">
               <DollarSign size={11} /> Pipeline
             </p>
-            <p className="font-mono text-lg text-amber">{pipelineValue.toLocaleString()}</p>
+            <p className="font-mono text-lg text-amber-dim">{pipelineValue.toLocaleString()}</p>
           </div>
         </div>
       </div>
@@ -116,7 +116,7 @@ function LeadList({ leads, activeLeadId, onSelect }) {
           onSelect={() => onSelect(lead.id)}
         />
       ))}
-      {leads.length === 0 && <p className="text-xs text-ink-300 px-2 py-4">No leads yet.</p>}
+      {leads.length === 0 && <p className="text-xs text-ink-400 px-2 py-4">No leads yet.</p>}
     </div>
   );
 }

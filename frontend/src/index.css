@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,62 +6,94 @@
 
 @layer base {
   html {
-    color-scheme: dark;
+    color-scheme: light;
   }
   body {
-    @apply bg-ink-900 text-ink-50 font-body antialiased;
-    background-image:
-      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(91, 110, 245, 0.12), transparent),
-      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(51, 214, 166, 0.06), transparent);
-    background-attachment: fixed;
+    @apply bg-paper-50 text-ink-800 font-body antialiased;
+    /* A faint ruled-ledger texture on the page background — quiet nod to
+       the product's real subject (calls and money, logged in rows). Never
+       visible once a white card sits on top of it. */
+    background-image: linear-gradient(rgba(28, 26, 22, 0.035) 1px, transparent 1px);
+    background-size: 100% 34px;
   }
   h1, h2, h3, h4 {
-    @apply font-display text-ink-50;
+    @apply font-display text-ink-900;
   }
   :focus-visible {
-    @apply outline-none ring-2 ring-signal ring-offset-2 ring-offset-ink-900;
+    @apply outline-none shadow-focus rounded-md;
   }
 }
 
 @layer components {
+  /* Surfaces ------------------------------------------------------------ */
   .card {
-    @apply bg-ink-700 border border-ink-500/60 rounded-2xl shadow-raised;
+    @apply bg-white border border-paper-200 rounded-xl shadow-card;
   }
   .card-raised {
-    @apply bg-ink-700 border border-ink-500/60 rounded-2xl shadow-raised-lg;
+    @apply bg-white border border-paper-200 rounded-xl shadow-raised-lg;
   }
+  .card-flat {
+    @apply bg-white border-y border-paper-200;
+  }
+
+  /* Buttons --------------------------------------------------------------
+     One filled accent per view is the rule: .btn-primary (forest) is the
+     default call to action; .btn-amber is reserved for money-moving actions
+     (buying a number, upgrading a plan); everything else is quieter. */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
            font-body font-medium text-sm text-white
-           bg-gradient-to-b from-signal-bright to-signal
-           shadow-raised border border-signal-bright/40
-           hover:brightness-110 active:brightness-95 active:shadow-pressed
+           bg-signal border border-signal-dim/30
+           hover:bg-signal-dim active:scale-[0.99]
            transition disabled:opacity-40 disabled:pointer-events-none;
   }
   .btn-amber {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
-           font-body font-medium text-sm text-ink-950
-           bg-gradient-to-b from-amber-bright to-amber
-           shadow-raised border border-amber-bright/40
-           hover:brightness-105 active:brightness-95 active:shadow-pressed
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           font-body font-medium text-sm text-white
+           bg-amber border border-amber-dim/30
+           hover:bg-amber-dim active:scale-[0.99]
+           transition disabled:opacity-40 disabled:pointer-events-none;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           font-body font-medium text-sm text-ink-800
+           bg-white border border-paper-300
+           hover:bg-paper-100 hover:border-ink-300
            transition disabled:opacity-40 disabled:pointer-events-none;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
-           font-body font-medium text-sm text-ink-100
-           bg-ink-600/60 border border-ink-500/60
-           hover:bg-ink-600 hover:text-white
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           font-body font-medium text-sm text-ink-600
+           hover:bg-paper-100 hover:text-ink-900
            transition disabled:opacity-40 disabled:pointer-events-none;
   }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           font-body font-medium text-sm text-white
+           bg-alert border border-alert-dim/30
+           hover:bg-alert-dim active:scale-[0.99]
+           transition disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  /* Forms ----------------------------------------------------------------*/
   .input-field {
-    @apply w-full rounded-xl bg-ink-800 border border-ink-500/70 px-3.5 py-2.5
-           text-sm text-ink-50 placeholder:text-ink-300
-           focus:border-signal/70 transition;
+    @apply w-full rounded-lg bg-white border border-paper-300 px-3.5 py-2.5
+           text-sm text-ink-900 placeholder:text-ink-400
+           focus:border-signal focus:shadow-focus transition;
   }
   .label-eyebrow {
-    @apply text-[11px] font-mono uppercase tracking-[0.14em] text-ink-200;
+    @apply text-[11px] font-mono uppercase tracking-[0.14em] text-ink-500;
   }
+
+  /* Ledger — the signature motif: ruled rows with tabular figures, used for
+     activity feeds, invoices, and call/lead lists. */
+  .ledger-row {
+    @apply flex items-center justify-between gap-3 py-3 px-0
+           border-b border-paper-200 last:border-b-0
+           font-mono text-[13px] tabular-nums text-ink-700;
+  }
+
   .glass-panel {
-    @apply bg-ink-900/70 backdrop-blur-xl border border-ink-500/50;
+    @apply bg-white/85 backdrop-blur-md border border-paper-200;
   }
 }

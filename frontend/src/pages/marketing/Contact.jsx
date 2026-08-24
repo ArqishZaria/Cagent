@@ -30,23 +30,23 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen bg-ink-900">
+    <div className="min-h-screen bg-paper-50">
       <PublicNav />
 
       <section className="max-w-3xl mx-auto px-6 pt-24 pb-24">
         <span className="label-eyebrow inline-block mb-5">Contact</span>
-        <h1 className="font-display text-4xl font-semibold mb-4">Let's set up your team.</h1>
-        <p className="text-ink-200 mb-10 max-w-lg">
+        <h1 className="font-display text-4xl font-semibold mb-4 text-ink-900">Let's set up your team.</h1>
+        <p className="text-ink-600 mb-10 max-w-lg">
           Tell us a bit about your team and we'll reach out to get your numbers, agents, and
           CRM set up.
         </p>
 
         {submitted ? (
-          <div className="card p-8 flex items-start gap-4 bg-live/5 border-live/30">
+          <div className="card p-8 flex items-start gap-4 bg-live/5 !border-live/30">
             <CheckCircle2 size={22} className="text-live shrink-0 mt-0.5" />
             <div>
-              <p className="font-display font-semibold text-lg mb-1">Message sent.</p>
-              <p className="text-sm text-ink-200">
+              <p className="font-display font-semibold text-lg mb-1 text-ink-900">Message sent.</p>
+              <p className="text-sm text-ink-600">
                 We'll get back to you within one business day at {form.email}.
               </p>
             </div>
