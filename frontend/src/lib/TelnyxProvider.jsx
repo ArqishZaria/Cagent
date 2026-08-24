@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { TelnyxRTCProvider } from "@telnyx/react-client";
 import api from "../lib/api";
-import { TELNYX_RTC_ICE_SERVERS } from "../lib/telnyxIceServers";
 
 /**
  * AppTelnyxProvider
@@ -46,7 +45,6 @@ export default function AppTelnyxProvider({ children }) {
 
   const credential = { login_token: loginToken };
   const options = {
-    iceServers: TELNYX_RTC_ICE_SERVERS,
     ringtoneFile: "/sounds/ringtone.mp3",
     ringbackFile: "/sounds/ringback.mp3",
   };
