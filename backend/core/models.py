@@ -232,3 +232,33 @@ class ScrapeTask(models.Model):
 
     def __str__(self):
         return f"{self.query} ({self.status})"
+
+class LeadUploadTask(models.Model):
+    """
+    Tracks one bulk CSV/Excel upload job. Mirrors ScrapeTask's PENDING ->
+    COMPLETED/FAILED pattern (same polling approach on the frontend) since a
+    large file is processed in the background, not while the request waits.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="lead_upload_tasks")
+    requested_by = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="lead_upload_tasks"
+    )
+    original_filename = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    total_rows = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    updated_count = models.PositiveIntegerField(default=0)
+    error_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.original_filename} ({self.status})"

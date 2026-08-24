@@ -1,16 +1,23 @@
+import os
+import uuid
+
+from django.conf import settings
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import CustomUser, Lead, ScrapeTask
+from core.models import CustomUser, Lead, LeadUploadTask, ScrapeTask
 from core.permissions import IsTenantMember
 from crm.serializers import LeadSerializer
-from scraper.tasks import run_lead_scrape
+from scraper.tasks import process_lead_upload, run_lead_scrape
+
+ALLOWED_UPLOAD_EXTENSIONS = (".csv", ".xlsx", ".xls")
 
 
 class ScrapeTaskStatusView(APIView):
@@ -108,3 +115,70 @@ class ExistingLeadsSearchView(APIView):
 
         leads = leads.order_by("-created_at")[:50]
         return Response(LeadSerializer(leads, many=True).data)
+
+
+class LeadUploadView(APIView):
+    """
+    POST /api/scraper/upload/  (multipart/form-data, field name "file")
+
+    Accepts a .csv or .xlsx file, saves it to a temp folder, and queues
+    background processing (scraper.tasks.process_lead_upload) — the same
+    "kick off a background job, poll for status" pattern as the web
+    scraper, since a large spreadsheet shouldn't make the request wait.
+    """
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        file_obj = request.FILES.get("file")
+        if not file_obj:
+            return Response({"detail": "file is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file_obj.name.lower().endswith(ALLOWED_UPLOAD_EXTENSIONS):
+            return Response(
+                {"detail": "Please upload a .csv or .xlsx file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        upload_dir = os.path.join(settings.BASE_DIR, "lead_uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        ext = os.path.splitext(file_obj.name)[1]
+        temp_path = os.path.join(upload_dir, f"{uuid.uuid4().hex}{ext}")
+
+        with open(temp_path, "wb") as f:
+            for chunk in file_obj.chunks():
+                f.write(chunk)
+
+        upload_task = LeadUploadTask.objects.create(
+            tenant=request.user.tenant,
+            requested_by=request.user,
+            original_filename=file_obj.name,
+            status=LeadUploadTask.Status.PENDING,
+        )
+        process_lead_upload.delay(upload_task.id, temp_path)
+
+        return Response(
+            {"id": upload_task.id, "status": upload_task.status},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class LeadUploadStatusView(APIView):
+    """GET /api/scraper/upload-tasks/<id>/ — polled until COMPLETED or FAILED."""
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    def get(self, request, pk):
+        task = get_object_or_404(LeadUploadTask, pk=pk, tenant=request.user.tenant)
+        return Response(
+            {
+                "id": task.id,
+                "status": task.status,
+                "original_filename": task.original_filename,
+                "total_rows": task.total_rows,
+                "created_count": task.created_count,
+                "updated_count": task.updated_count,
+                "error_count": task.error_count,
+            }
+        )

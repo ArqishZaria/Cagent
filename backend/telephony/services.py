@@ -107,6 +107,7 @@ def search_available_numbers(area_code: str, limit: int = 10) -> list[dict]:
         params={
             "filter[phone_number][starts_with]": f"+1{area_code}",
             "filter[limit]": limit,
+            "filter[best_effort]": "true",
         },
         timeout=10,
     )
