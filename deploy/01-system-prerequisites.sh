@@ -33,8 +33,8 @@ apt-get install -y \
     ufw
 
 # --- Application user + directories -----------------------------------------
-APP_USER="voipapp"
-APP_DIR="/opt/voip-saas"
+APP_USER="cagentapp"
+APP_DIR="/opt/cagent"
 
 if ! id -u "$APP_USER" >/dev/null 2>&1; then
     echo "==> Creating application user: $APP_USER"

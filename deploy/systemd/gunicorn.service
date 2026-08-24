@@ -6,11 +6,11 @@ Wants=redis-server.service
 [Service]
 Type=notify
 NotifyAccess=main
-User=voipapp
-Group=voipapp
-WorkingDirectory=/opt/voip-saas/backend
-EnvironmentFile=/opt/voip-saas/backend/.env
-ExecStart=/opt/voip-saas/venv/bin/gunicorn \
+User=cagentapp
+Group=cagentapp
+WorkingDirectory=/opt/cagent/backend
+EnvironmentFile=/opt/cagent/backend/.env
+ExecStart=/opt/cagent/venv/bin/gunicorn \
     config.wsgi:application \
     --bind 127.0.0.1:8000 \
     --workers 3 \

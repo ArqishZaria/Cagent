@@ -5,11 +5,11 @@ Wants=redis-server.service
 
 [Service]
 Type=simple
-User=voipapp
-Group=voipapp
-WorkingDirectory=/opt/voip-saas/backend
-EnvironmentFile=/opt/voip-saas/backend/.env
-ExecStart=/opt/voip-saas/venv/bin/celery -A config beat \
+User=cagentapp
+Group=cagentapp
+WorkingDirectory=/opt/cagent/backend
+EnvironmentFile=/opt/cagent/backend/.env
+ExecStart=/opt/cagent/venv/bin/celery -A config beat \
     --loglevel=info \
     --logfile=/var/log/voip-saas/celery-beat.log \
     --scheduler django_celery_beat.schedulers:DatabaseScheduler

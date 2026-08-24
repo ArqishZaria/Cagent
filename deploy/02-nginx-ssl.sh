@@ -30,8 +30,8 @@ server {
     server_name ${DOMAIN};
 
     # Certbot fills these in automatically after the first successful run.
-    # ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    #ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    #ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
 
     client_max_body_size 20M;
 
@@ -49,7 +49,7 @@ server {
     proxy_read_timeout    60s;
 
     location /static/ {
-        alias /opt/voip-saas/backend/staticfiles/;
+        alias /opt/cagent/backend/staticfiles/;
     }
 }
 EOF

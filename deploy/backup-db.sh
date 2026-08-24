@@ -15,10 +15,10 @@
 # ==============================================================================
 set -euo pipefail
 
-DB_NAME="voip_saas"
-DB_USER="voip_saas_user"
-DB_HOST="voip-saas-pg.postgres.database.azure.com"   # <- set to your server's FQDN
-BACKUP_DIR="/opt/voip-saas/backups"
+DB_NAME="cagent"
+DB_USER="cagent_admin"
+DB_HOST="cagent.postgres.database.azure.com"   # <- set to your server's FQDN
+BACKUP_DIR="/opt/cagent/backups"
 RETENTION_DAYS=7
 TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.sql.gz"
