@@ -7,6 +7,19 @@ import SignalBars from "./SignalBars";
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
 
 /**
+ * Normalizes a US-style phone number into E.164 format for Telnyx's WebRTC
+ * client. Strips all non-digit characters, then prefixes '1' if the result
+ * looks like a bare 10-digit US number. Handles leads stored as
+ * '(512) 478-2500' or similar unnormalized formats from manual entry,
+ * scraping, or bulk upload.
+ */
+function normalizeToE164(phoneNumber) {
+  const digits = (phoneNumber || "").replace(/\D/g, "");
+  if (!digits) return phoneNumber; // nothing we can do — let Telnyx reject it clearly
+  const withCountryCode = digits.length === 10 ? `1${digits}` : digits;
+  return `+${withCountryCode}`;
+}
+/**
  * Dialer — the right-hand WebRTC dialpad. Reads the Telnyx client off
  * TelnyxRTCContext (provided by AppTelnyxProvider higher up the tree) and
  * drives calls through it directly, per @telnyx/react-client's documented
@@ -37,8 +50,9 @@ export default function Dialer({ activeLead, onSaveNote, fromNumber }) {
   const press = (key) => setDigits((d) => d + key);
 
   const call = () => {
-    const destination = activeLead?.phone_number || digits;
-    if (!destination || !client || !fromNumber) return;
+    const rawDestination = activeLead?.phone_number || digits;
+    if (!rawDestination || !client || !fromNumber) return;
+    const destination = normalizeToE164(rawDestination);
     client.newCall({
       destinationNumber: destination,
       callerNumber: fromNumber,
