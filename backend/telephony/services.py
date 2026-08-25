@@ -15,6 +15,9 @@ from django.core.cache import cache
 
 TELNYX_API_BASE = "https://api.telnyx.com/v2"
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TelnyxAPIError(Exception):
     pass
@@ -130,17 +133,46 @@ def search_available_numbers(area_code: str, limit: int = 10) -> list[dict]:
 
 def purchase_number(phone_number: str) -> dict:
     """
-    POST /v2/number_orders — orders the given number. Telnyx provisions it
-    near-instantly for most US numbers; the order response includes the
-    order id we store as PhoneNumber.telnyx_order_id.
+    Orders the given number via Telnyx, then wires it up for both Voice
+    (assigns it to our SIP Connection so calls route through the WebRTC
+    dialer) and SMS (assigns it to our Messaging Profile so it's allowed to
+    send/receive texts) — so a newly purchased number is immediately usable
+    for both, without any manual portal steps per number.
     """
     resp = requests.post(
         f"{TELNYX_API_BASE}/number_orders",
         headers=_telnyx_headers(),
-        json={"phone_numbers": [{"phone_number": phone_number}]},
+        json={
+            "phone_numbers": [{"phone_number": phone_number}],
+            "connection_id": settings.TELNYX_CONNECTION_ID,
+        },
         timeout=15,
     )
     if resp.status_code >= 400:
         raise TelnyxAPIError(f"Number purchase failed: {resp.status_code} {resp.text}")
 
-    return resp.json()["data"]
+    order_data = resp.json()["data"]
+
+    # Assign to the Messaging Profile for SMS. Non-fatal on failure — the
+    # number is still usable for voice immediately either way, but we log
+    # loudly so a failed SMS assignment doesn't go unnoticed.
+    if settings.TELNYX_MESSAGING_PROFILE_ID:
+        try:
+            update_resp = requests.patch(
+                f"{TELNYX_API_BASE}/messaging_phone_numbers/{phone_number}",
+                headers=_telnyx_headers(),
+                json={"messaging_profile_id": settings.TELNYX_MESSAGING_PROFILE_ID},
+                timeout=10,
+            )
+            if update_resp.status_code >= 400:
+                raise TelnyxAPIError(
+                    f"Messaging profile assignment failed: {update_resp.status_code} {update_resp.text}"
+                )
+        except TelnyxAPIError:
+            logger.exception(
+                "Number %s purchased and voice-connected, but SMS assignment failed — "
+                "assign it to a Messaging Profile manually in the Telnyx portal if needed.",
+                phone_number,
+            )
+
+    return order_data

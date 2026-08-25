@@ -227,6 +227,7 @@ TELNYX_PUBLIC_KEY = os.environ.get("TELNYX_PUBLIC_KEY", "")
 TELNYX_WEBHOOK_SECRET = os.environ.get("TELNYX_WEBHOOK_SECRET", "")
 TELNYX_CONNECTION_ID = os.environ.get("TELNYX_CONNECTION_ID", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+TELNYX_MESSAGING_PROFILE_ID = os.environ.get("TELNYX_MESSAGING_PROFILE_ID", "")
 
 # The telnyx SDK reads its key off this module-level attribute rather than
 # taking it per-call, so every telephony view/service can just `import telnyx`
