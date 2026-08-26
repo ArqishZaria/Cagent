@@ -1,8 +1,8 @@
-import { useContext, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { TelnyxRTCContext, useNotification } from "@telnyx/react-client";
 import { ArrowRight, Mic, MicOff, Phone, PhoneOff } from "lucide-react";
 import SignalBars from "./SignalBars";
+import { useContext, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { TelnyxRTCContext, useNotification, Audio } from "@telnyx/react-client";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
 
@@ -171,6 +171,11 @@ export default function Dialer({ activeLead, onSaveNote, fromNumber }) {
           onChange={(e) => setNote(e.target.value)}
         />
       </div>
+
+      {/* Remote audio output — required by @telnyx/react-client; without
+          this, the peer connection receives the other party's audio but
+          nothing ever plays it. Renders nothing visible. */}
+      <Audio stream={activeCall && activeCall.remoteStream} />
     </div>
   );
 }
