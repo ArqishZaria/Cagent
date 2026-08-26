@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Ban, DollarSign, PhoneOff, Send } from "lucide-react";
+import { ArrowRight, Ban, DollarSign, Phone, PhoneOff, Send } from "lucide-react";
 import api from "../lib/api";
+import useTelnyxCall from "../hooks/useTelnyxCall";
 
 const STATUS_COLORS = {
   NEW: "bg-ink-100 text-ink-700 border-ink-200",
@@ -17,8 +18,13 @@ const STATUS_COLORS = {
  * disabled) whenever lead.do_not_contact is true, mirroring the backend's
  * own hard-block in telephony.views.SMSSendView — the UI shouldn't invite an
  * action the server will reject anyway.
+ *
+ * A call icon in the header starts a WebRTC call via useTelnyxCall(); the
+ * actual in-call UI (mute, hang up, timer) lives in the globally-mounted
+ * <CallWidget /> in PortalLayout, not here.
  */
 export default function LeadChatPanel({ lead, fromNumber }) {
+  const { startCall, activeCall } = useTelnyxCall();
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -68,6 +74,11 @@ export default function LeadChatPanel({ lead, fromNumber }) {
     }
   };
 
+  const callLead = () => {
+    if (!lead?.phone_number || !fromNumber) return;
+    startCall({ destinationNumber: lead.phone_number, fromNumber, callerName: lead.company || "" });
+  };
+
   return (
     <div className="card h-full flex flex-col overflow-hidden">
       {/* Lead profile */}
@@ -82,9 +93,20 @@ export default function LeadChatPanel({ lead, fromNumber }) {
               {lead.company}
             </p>
           </div>
-          <span className={`text-[11px] font-mono px-2 py-1 rounded-full border ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
-            {lead.status}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`text-[11px] font-mono px-2 py-1 rounded-full border ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
+              {lead.status}
+            </span>
+            <button
+              onClick={callLead}
+              disabled={!fromNumber || Boolean(activeCall)}
+              className="btn-primary !rounded-full !p-2.5"
+              aria-label="Call lead"
+              title={activeCall ? "Already on a call" : "Call this lead"}
+            >
+              <Phone size={16} />
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <span className="font-mono text-ink-800">{lead.phone_number}</span>
