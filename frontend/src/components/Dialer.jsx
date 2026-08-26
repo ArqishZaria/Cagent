@@ -37,6 +37,7 @@ export default function Dialer({ activeLead, onSaveNote, fromNumber }) {
 
   const callState = activeCall?.state; // 'new' | 'ringing' | 'active' | 'hangup' | ...
   const inCall = callState === "active" || callState === "ringing" || callState === "new";
+  const isIncomingRing = activeCall?.direction === "inbound" && callState === "ringing";
 
   useEffect(() => {
     if (callState !== "active") {
@@ -131,7 +132,24 @@ export default function Dialer({ activeLead, onSaveNote, fromNumber }) {
 
       {/* Call controls */}
       <div className="flex items-center justify-center gap-4 mb-5">
-        {!inCall ? (
+        {isIncomingRing ? (
+          <>
+            <button
+              onClick={() => activeCall.answer()}
+              className="btn-primary !rounded-full !p-4 shadow-raised-lg bg-live border-live-dim/40"
+              aria-label="Answer"
+            >
+              <Phone size={20} />
+            </button>
+            <button
+              onClick={() => activeCall.hangup()}
+              className="!rounded-full !p-4 bg-alert text-white shadow-raised-lg border border-alert-dim/40 hover:bg-alert-dim transition"
+              aria-label="Decline"
+            >
+              <PhoneOff size={20} />
+            </button>
+          </>
+        ) : !inCall ? (
           <button
             onClick={call}
             disabled={!digits && !activeLead}
@@ -142,19 +160,10 @@ export default function Dialer({ activeLead, onSaveNote, fromNumber }) {
           </button>
         ) : (
           <>
-            <button
-              onClick={toggleMute}
-              className="btn-secondary !rounded-full !p-3.5"
-              aria-label={muted ? "Unmute" : "Mute"}
-            >
+            <button onClick={toggleMute} className="btn-secondary !rounded-full !p-3.5" aria-label={muted ? "Unmute" : "Mute"}>
               {muted ? <MicOff size={18} /> : <Mic size={18} />}
             </button>
-            <button
-              onClick={hangup}
-              className="!rounded-full !p-4 bg-alert text-white
-                         shadow-raised-lg border border-alert-dim/40 hover:bg-alert-dim transition"
-              aria-label="Hang up"
-            >
+            <button onClick={hangup} className="!rounded-full !p-4 bg-alert text-white shadow-raised-lg border border-alert-dim/40 hover:bg-alert-dim transition" aria-label="Hang up">
               <PhoneOff size={20} />
             </button>
           </>

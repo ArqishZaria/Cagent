@@ -37,10 +37,13 @@ def verify_telnyx_webhook(request):
             timestamp_header,
             settings.TELNYX_WEBHOOK_SECRET,
         )
-    except telnyx.error.SignatureVerificationError:
+    except telnyx.error.SignatureVerificationError as exc:
+        import logging
+        logging.getLogger(__name__).error("Telnyx signature verification failed: %s", exc)
         raise PermissionDenied("Invalid Telnyx webhook signature.")
-    except Exception:
-        # Malformed payload, unexpected SDK error, etc. — never trust it.
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("Could not verify Telnyx webhook: %s", exc)
         raise PermissionDenied("Could not verify Telnyx webhook.")
 
     return event

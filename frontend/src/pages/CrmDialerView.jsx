@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowRight, DollarSign, PhoneCall, PhoneOff, Sparkles } from "lucide-react";
 import api from "../lib/api";
-import AppTelnyxProvider from "../lib/TelnyxProvider";
 import LeadChatPanel from "../components/LeadChatPanel";
 import Dialer from "../components/Dialer";
 import LeadListItem from "../components/LeadListItem";
@@ -64,44 +63,42 @@ export default function CrmDialerPage() {
   };
 
   return (
-    <AppTelnyxProvider>
-      <div className="min-h-screen flex flex-col">
-        <PipelineHeader leads={leads} pipelineValue={pipelineValue} />
+    <div className="min-h-screen flex flex-col">
+      <PipelineHeader leads={leads} pipelineValue={pipelineValue} />
 
-        {numbersLoaded && !hasNumber && (
-          <div className="border-b border-paper-200 bg-amber/[0.06]">
-            <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-3 text-sm">
-              <PhoneOff size={15} className="text-amber-dim shrink-0" />
-              <p className="text-ink-700">
-                No phone number connected yet — calls and texts need one to go out.
-              </p>
-              <Link
-                to="/app/settings"
-                className="inline-flex items-center gap-1 text-amber-dim font-medium hover:underline shrink-0 ml-auto"
-              >
-                Buy a number <ArrowRight size={13} />
-              </Link>
-            </div>
+      {numbersLoaded && !hasNumber && (
+        <div className="border-b border-paper-200 bg-amber/[0.06]">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-3 text-sm">
+            <PhoneOff size={15} className="text-amber-dim shrink-0" />
+            <p className="text-ink-700">
+              No phone number connected yet — calls and texts need one to go out.
+            </p>
+            <Link
+              to="/app/settings"
+              className="inline-flex items-center gap-1 text-amber-dim font-medium hover:underline shrink-0 ml-auto"
+            >
+              Buy a number <ArrowRight size={13} />
+            </Link>
           </div>
-        )}
+        </div>
+      )}
 
-        {showNoLeadsState ? (
-          <NoLeadsState />
-        ) : (
-          <div className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-3">
-              <LeadList leads={leads} activeLeadId={activeLeadId} onSelect={setActiveLeadId} />
-            </div>
-            <div className="lg:col-span-5 h-[calc(100vh-220px)]">
-              <LeadChatPanel lead={activeLead} fromNumber={fromNumber} />
-            </div>
-            <div className="lg:col-span-4 h-[calc(100vh-220px)]">
-              <Dialer activeLead={activeLead} onSaveNote={saveCallNote} fromNumber={fromNumber} />
-            </div>
+      {showNoLeadsState ? (
+        <NoLeadsState />
+      ) : (
+        <div className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-3">
+            <LeadList leads={leads} activeLeadId={activeLeadId} onSelect={setActiveLeadId} />
           </div>
-        )}
-      </div>
-    </AppTelnyxProvider>
+          <div className="lg:col-span-5 h-[calc(100vh-220px)]">
+            <LeadChatPanel lead={activeLead} fromNumber={fromNumber} />
+          </div>
+          <div className="lg:col-span-4 h-[calc(100vh-220px)]">
+            <Dialer activeLead={activeLead} onSaveNote={saveCallNote} fromNumber={fromNumber} />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
