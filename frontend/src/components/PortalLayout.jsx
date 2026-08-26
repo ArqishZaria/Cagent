@@ -3,6 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { Building2, ClipboardList, PhoneCall, Sparkles } from "lucide-react";
 import { onPaymentRequired } from "../lib/api";
 import PaymentOverdueOverlay from "./PaymentOverdueOverlay";
+import IncomingCallBanner from "./IncomingCallBanner";
 import useIdleLogout from "../hooks/useIdleLogout";
 import AppTelnyxProvider from "../lib/TelnyxProvider";
 
@@ -28,11 +29,13 @@ export default function PortalLayout() {
         <main className="flex-1 min-w-0">
           <Outlet />
         </main>
+        <IncomingCallBanner />
         {overdue && <PaymentOverdueOverlay details={overdue} invoice={overdue.invoice} />}
       </div>
     </AppTelnyxProvider>
   );
 }
+
 function SideNav() {
   return (
     <nav className="w-60 shrink-0 border-r border-paper-200 bg-white px-4 py-6 hidden md:flex flex-col gap-1">
