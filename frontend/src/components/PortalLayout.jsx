@@ -37,35 +37,48 @@ export default function PortalLayout() {
   );
 }
 
+/**
+ * SideNav — WhatsApp-Web-style icon rail: thin, icon-only, with the label
+ * appearing as a tooltip on hover rather than always-visible text. Each item
+ * is wrapped in a `group` so the tooltip (absolutely positioned, hidden by
+ * default) can react to hovering its parent via group-hover.
+ */
 function SideNav() {
   return (
-    <nav className="w-60 shrink-0 border-r border-paper-200 bg-white px-4 py-6 hidden md:flex flex-col gap-1">
-      <div className="px-2 mb-8 flex items-center gap-2">
+    <nav className="w-16 shrink-0 border-r border-paper-200 bg-white hidden md:flex flex-col items-center py-5 gap-1">
+      <div className="w-9 h-9 rounded-lg bg-signal/10 flex items-center justify-center mb-4">
         <span className="w-2 h-2 rounded-full bg-signal" />
-        <span className="font-display font-semibold text-lg tracking-tight text-ink-900">
-          cagent
-        </span>
       </div>
+
       {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
           end={to === "/app"}
           className={({ isActive }) =>
-            `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition ${
+            `group relative flex items-center justify-center w-11 h-11 rounded-lg transition ${
               isActive
-                ? "bg-signal/10 text-signal font-medium"
-                : "text-ink-600 hover:bg-paper-100 hover:text-ink-900"
+                ? "bg-signal/10 text-signal"
+                : "text-ink-500 hover:bg-paper-100 hover:text-ink-900"
             }`
           }
         >
-          <Icon size={16} strokeWidth={2} />
-          {label}
+          <Icon size={19} strokeWidth={2} />
+
+          {/* Tooltip — hidden by default, revealed on hover of the parent
+              NavLink via group-hover. Positioned to the right of the rail,
+              with a small arrow-less pointer effect via negative margin. */}
+          <span
+            className="pointer-events-none absolute left-full ml-3 whitespace-nowrap
+                       rounded-md bg-ink-900 px-2.5 py-1.5 text-xs font-medium text-white
+                       opacity-0 scale-95 origin-left
+                       group-hover:opacity-100 group-hover:scale-100
+                       transition duration-150 z-50 shadow-raised-lg"
+          >
+            {label}
+          </span>
         </NavLink>
       ))}
-      <div className="mt-auto px-3 pt-6 border-t border-paper-200">
-        <p className="text-[11px] text-ink-400 font-mono">One phone system.<br />One ledger.</p>
-      </div>
     </nav>
   );
 }

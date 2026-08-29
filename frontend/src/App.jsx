@@ -6,7 +6,6 @@ import PricingPage from "./pages/marketing/Pricing";
 import ContactPage from "./pages/marketing/Contact";
 import LoginPage from "./pages/Login";
 import ForgotPasswordPage from "./pages/ForgotPassword";
-
 import RequireAuth from "./components/RequireAuth";
 import PortalLayout from "./components/PortalLayout";
 import CrmDialerPage from "./pages/CrmDialerView";
