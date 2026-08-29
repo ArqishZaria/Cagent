@@ -14,14 +14,9 @@ const STATUS_COLORS = {
 
 /**
  * LeadChatPanel — left side of the CRM/Dialer view: lead profile up top,
- * continuous 2-way SMS thread below. The SMS input is hard-hidden (not just
- * disabled) whenever lead.do_not_contact is true, mirroring the backend's
- * own hard-block in telephony.views.SMSSendView — the UI shouldn't invite an
- * action the server will reject anyway.
- *
- * A call icon in the header starts a WebRTC call via useTelnyxCall(); the
- * actual in-call UI (mute, hang up, timer) lives in the globally-mounted
- * <CallWidget /> in PortalLayout, not here.
+ * continuous 2-way SMS thread below. `fromNumber` is { id, phone_number }
+ * so the call icon can pass fromNumberId through for call-log attribution
+ * (see useTelnyxCall's logCall()).
  */
 export default function LeadChatPanel({ lead, fromNumber }) {
   const { startCall, activeCall } = useTelnyxCall();
@@ -59,7 +54,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
     try {
       await api.post("/api/telephony/sms/send/", {
         lead_id: lead.id,
-        from_number: fromNumber,
+        from_number: fromNumber.phone_number,
         message: text,
       });
       setMessages((prev) => [
@@ -76,12 +71,17 @@ export default function LeadChatPanel({ lead, fromNumber }) {
 
   const callLead = () => {
     if (!lead?.phone_number || !fromNumber) return;
-    startCall({ destinationNumber: lead.phone_number, fromNumber, callerName: lead.company || "" });
+    startCall({
+      destinationNumber: lead.phone_number,
+      fromNumber: fromNumber.phone_number,
+      fromNumberId: fromNumber.id,
+      callerName: lead.company || "",
+      leadId: lead.id,
+    });
   };
 
   return (
     <div className="card h-full flex flex-col overflow-hidden">
-      {/* Lead profile */}
       <div className="p-5 border-b border-paper-200">
         <div className="flex items-start justify-between mb-3">
           <div>
@@ -124,7 +124,6 @@ export default function LeadChatPanel({ lead, fromNumber }) {
         </div>
       </div>
 
-      {/* SMS thread */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3 bg-paper-50/60">
         {messages.length === 0 && <p className="text-xs text-ink-400">No messages yet.</p>}
         {messages.map((m) => (
@@ -139,9 +138,6 @@ export default function LeadChatPanel({ lead, fromNumber }) {
         ))}
       </div>
 
-      {/* Conditional send box — hidden entirely, not just disabled, whenever
-          the message genuinely can't go out, rather than leaving an active
-          input that silently fails against the backend's own hard-block. */}
       {lead.do_not_contact ? (
         <div className="flex items-center gap-2 px-5 py-4 border-t border-paper-200 bg-alert/5 text-xs text-alert">
           <Ban size={14} />

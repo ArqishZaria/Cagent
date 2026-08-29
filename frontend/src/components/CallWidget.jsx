@@ -4,54 +4,104 @@ import SignalBars from "./SignalBars";
 import useTelnyxCall from "../hooks/useTelnyxCall";
 
 export default function CallWidget() {
-  const { activeCall, callState, inCall, isIncomingRing, muted, elapsed, answer, hangup, toggleMute } = useTelnyxCall();
+  const {
+    activeCall,
+    callState,
+    inCall,
+    isIncomingRing,
+    muted,
+    elapsed,
+    waitingCall,
+    answer,
+    hangup,
+    acceptWaiting,
+    declineWaiting,
+    toggleMute,
+  } = useTelnyxCall();
 
-  if (!activeCall) return null;
+  if (!activeCall && !waitingCall) return null;
 
-  const name = activeCall.options?.remoteCallerName || activeCall.options?.callerName || "Unknown";
-  const number = activeCall.options?.remoteCallerNumber || activeCall.options?.destinationNumber || "";
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
+  const name = activeCall?.options?.remoteCallerName || activeCall?.options?.callerName || "Unknown";
+  const number = activeCall?.options?.remoteCallerNumber || activeCall?.options?.destinationNumber || "";
+
+  const waitingName = waitingCall?.options?.remoteCallerName || waitingCall?.options?.callerName || "Unknown";
+  const waitingNumber = waitingCall?.options?.remoteCallerNumber || waitingCall?.options?.destinationNumber || "";
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-72 card-raised overflow-hidden animate-fade-up">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-paper-200 bg-paper-50">
-        <span className="text-[11px] font-mono uppercase tracking-wide text-ink-500">
-          {callState === "active" ? formatTime(elapsed) : callState}
-        </span>
-        <button onClick={hangup} className="text-ink-400 hover:text-alert transition text-xs">
-          End
-        </button>
-      </div>
+    <div className="fixed bottom-6 right-6 z-50 w-72 flex flex-col gap-2">
+      {waitingCall && (
+        <div className="card-raised overflow-hidden animate-fade-up border-2 !border-live/50">
+          <div className="px-4 py-2.5 bg-live/10 border-b border-live/20">
+            <span className="text-[11px] font-mono uppercase tracking-wide text-live">Incoming call</span>
+          </div>
+          <div className="px-4 py-3">
+            <p className="font-display font-semibold text-sm text-ink-900 truncate">{waitingName}</p>
+            <p className="font-mono text-xs text-ink-500">{waitingNumber}</p>
+          </div>
+          <div className="flex items-center justify-center gap-4 pb-4">
+            <button
+              onClick={acceptWaiting}
+              className="btn-primary !rounded-full !p-3 bg-live border-live-dim/40"
+              aria-label="Accept and end current call"
+              title="Accept — ends your current call"
+            >
+              <Phone size={16} />
+            </button>
+            <button
+              onClick={declineWaiting}
+              className="!rounded-full !p-3 bg-alert text-white border border-alert-dim/40 hover:bg-alert-dim transition"
+              aria-label="Decline"
+            >
+              <PhoneOff size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
-      <div className="flex flex-col items-center py-6 px-4">
-        <SignalBars bars={7} size="md" color={callState === "active" ? "live" : "signal"} active={inCall} />
-        <p className="font-display font-semibold text-base text-ink-900 mt-4 truncate max-w-full">{name}</p>
-        <p className="font-mono text-xs text-ink-500 mt-0.5">{number}</p>
-      </div>
+      {activeCall && (
+        <div className="card-raised overflow-hidden animate-fade-up">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-paper-200 bg-paper-50">
+            <span className="text-[11px] font-mono uppercase tracking-wide text-ink-500">
+              {callState === "active" ? formatTime(elapsed) : callState}
+            </span>
+            <button onClick={hangup} className="text-ink-400 hover:text-alert transition text-xs">
+              End
+            </button>
+          </div>
 
-      <div className="flex items-center justify-center gap-4 pb-5">
-        {isIncomingRing ? (
-          <>
-            <button onClick={answer} className="btn-primary !rounded-full !p-3.5 bg-live border-live-dim/40" aria-label="Answer">
-              <Phone size={18} />
-            </button>
-            <button onClick={hangup} className="!rounded-full !p-3.5 bg-alert text-white border border-alert-dim/40 hover:bg-alert-dim transition" aria-label="Decline">
-              <PhoneOff size={18} />
-            </button>
-          </>
-        ) : (
-          <>
-            <button onClick={toggleMute} className="btn-secondary !rounded-full !p-3" aria-label={muted ? "Unmute" : "Mute"}>
-              {muted ? <MicOff size={16} /> : <Mic size={16} />}
-            </button>
-            <button onClick={hangup} className="!rounded-full !p-3.5 bg-alert text-white border border-alert-dim/40 hover:bg-alert-dim transition" aria-label="Hang up">
-              <PhoneOff size={18} />
-            </button>
-          </>
-        )}
-      </div>
+          <div className="flex flex-col items-center py-6 px-4">
+            <SignalBars bars={7} size="md" color={callState === "active" ? "live" : "signal"} active={inCall} />
+            <p className="font-display font-semibold text-base text-ink-900 mt-4 truncate max-w-full">{name}</p>
+            <p className="font-mono text-xs text-ink-500 mt-0.5">{number}</p>
+          </div>
 
-      <Audio stream={activeCall.remoteStream} />
+          <div className="flex items-center justify-center gap-4 pb-5">
+            {isIncomingRing ? (
+              <>
+                <button onClick={answer} className="btn-primary !rounded-full !p-3.5 bg-live border-live-dim/40" aria-label="Answer">
+                  <Phone size={18} />
+                </button>
+                <button onClick={hangup} className="!rounded-full !p-3.5 bg-alert text-white border border-alert-dim/40 hover:bg-alert-dim transition" aria-label="Decline">
+                  <PhoneOff size={18} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={toggleMute} className="btn-secondary !rounded-full !p-3" aria-label={muted ? "Unmute" : "Mute"}>
+                  {muted ? <MicOff size={16} /> : <Mic size={16} />}
+                </button>
+                <button onClick={hangup} className="!rounded-full !p-3.5 bg-alert text-white border border-alert-dim/40 hover:bg-alert-dim transition" aria-label="Hang up">
+                  <PhoneOff size={18} />
+                </button>
+              </>
+            )}
+          </div>
+
+          <Audio stream={activeCall.remoteStream} />
+        </div>
+      )}
     </div>
   );
 }

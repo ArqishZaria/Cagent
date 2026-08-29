@@ -24,12 +24,10 @@ from telephony.webhook_utils import verify_telnyx_webhook
 
 logger = logging.getLogger(__name__)
 
-# Message body substrings that trigger automatic opt-out, per SMS compliance rules.
 STOP_KEYWORDS = ("STOP", "UNSUBSCRIBE", "CANCEL")
 
 
 def _field(obj, name):
-    """Reads `name` off obj whether it's a plain dict or a Telnyx SDK object."""
     if obj is None:
         return None
     if isinstance(obj, dict):
@@ -49,20 +47,7 @@ def _sms_to_number(payload):
     return _field(to, "phone_number")
 
 
-# ------------------------------------------------------------------------------------
-# WebRTC credentials
-# ------------------------------------------------------------------------------------
-
-
 class WebRTCCredentialsView(APIView):
-    """
-    POST /api/telephony/webrtc/credentials/
-
-    Mints a short-lived Telnyx WebRTC JWT for the authenticated user. The
-    React dialer passes this straight into @telnyx/react-client's
-    TelnyxRTCProvider as `login_token`.
-    """
-
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def post(self, request):
@@ -75,19 +60,7 @@ class WebRTCCredentialsView(APIView):
         return Response({"login_token": token})
 
 
-# ------------------------------------------------------------------------------------
-# Voice webhook — inbound call routing + Interaction logging
-# ------------------------------------------------------------------------------------
-
-
 class VoiceWebhookView(APIView):
-    """
-    POST /api/telephony/webhooks/voice/
-
-    Receives Telnyx Call Control events. No user auth — Telnyx calls this
-    directly — so security comes entirely from verify_telnyx_webhook().
-    """
-
     permission_classes = [AllowAny]
     authentication_classes = []
 
@@ -104,18 +77,14 @@ class VoiceWebhookView(APIView):
                 self._handle_call_initiated(payload, call_control_id)
             elif event_type == "call.hangup":
                 self._handle_call_hangup(payload, call_control_id)
-            # Other event types (call.answered, call.bridged, ...) are
-            # acknowledged but don't need handling for basic inbound routing.
         except Exception:
-            # Never let a processing error surface a 500 to Telnyx (that just
-            # triggers webhook retries) — log it and ack anyway.
             logger.exception("Error handling voice webhook event_type=%s", event_type)
 
         return Response(status=status.HTTP_200_OK)
 
     def _handle_call_initiated(self, payload, call_control_id):
         if _field(payload, "direction") != "incoming":
-            return  # ignore legs we originated ourselves
+            return
 
         to_number = _field(payload, "to")
         from_number = _field(payload, "from")
@@ -143,9 +112,8 @@ class VoiceWebhookView(APIView):
             lead=lead,
             type=Interaction.Type.CALL,
             direction=Interaction.Direction.INBOUND,
+            phone_number=phone_number,  # <-- added: attributes this log entry to the number that rang
         )
-        # Remember which Interaction belongs to this call leg so call.hangup
-        # can fill in the duration on the SAME row instead of creating a new one.
         cache.set(f"telnyx:call_interaction:{call_control_id}", interaction.id, timeout=3600)
 
         if assigned_user:
@@ -154,14 +122,6 @@ class VoiceWebhookView(APIView):
             logger.info("Number %s has no assigned agent; call left unrouted.", to_number)
 
     def _route_to_agent(self, call_control_id, assigned_user):
-        """
-        Bridges the inbound call to the assigned agent's WebRTC client. The
-        agent's browser registers on Telnyx using the credential created in
-        services.get_or_create_webrtc_credential(), reachable at
-        sip:<username>@sip.telnyx.com — swap this for a "dial + bridge" pair
-        of Call Control commands instead of transfer() if you want ringing
-        multiple agents (a ring group) rather than a direct transfer.
-        """
         call = telnyx.Call()
         call.call_control_id = call_control_id
         call.transfer(to=f"sip:{assigned_user.username}@sip.telnyx.com")
@@ -177,20 +137,7 @@ class VoiceWebhookView(APIView):
         cache.delete(cache_key)
 
 
-# ------------------------------------------------------------------------------------
-# SMS — outbound send (with compliance hard-block) + inbound compliance webhook
-# ------------------------------------------------------------------------------------
-
-
 class SMSSendView(APIView):
-    """
-    POST /api/telephony/sms/send/
-    Body: {"lead_id": <int>, "from_number": "+1...", "message": "..."}
-
-    Hard-blocks sending whenever lead.do_not_contact is True — no override,
-    per spec.
-    """
-
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def post(self, request):
@@ -206,8 +153,6 @@ class SMSSendView(APIView):
 
         lead = get_object_or_404(Lead, id=lead_id, tenant=request.user.tenant)
 
-        # Agents may only text leads assigned to them; admins may text any
-        # lead in their tenant — same scoping rule used by TenantModelViewSet.
         if request.user.role == request.user.Role.AGENT and lead.owner_id not in (None, request.user.id):
             return Response({"detail": "This lead is not assigned to you."}, status=status.HTTP_403_FORBIDDEN)
 
@@ -234,6 +179,7 @@ class SMSSendView(APIView):
             type=Interaction.Type.SMS,
             direction=Interaction.Direction.OUTBOUND,
             message_body=message,
+            phone_number=sender_number,  # <-- added
         )
 
         return Response(
@@ -243,14 +189,6 @@ class SMSSendView(APIView):
 
 
 class SMSWebhookView(APIView):
-    """
-    POST /api/telephony/webhooks/sms/
-
-    Receives inbound SMS from Telnyx. Any message containing STOP,
-    UNSUBSCRIBE, or CANCEL (case-insensitive) automatically flips
-    lead.do_not_contact — this is a hard compliance rule with no exceptions.
-    """
-
     permission_classes = [AllowAny]
     authentication_classes = []
 
@@ -304,20 +242,11 @@ class SMSWebhookView(APIView):
             type=Interaction.Type.SMS,
             direction=Interaction.Direction.INBOUND,
             message_body=text,
+            phone_number=phone_number,  # <-- added
         )
 
 
-# ------------------------------------------------------------------------------------
-# Number search, purchase, and list/assign (Part 2D)
-# ------------------------------------------------------------------------------------
-
-
 class NumberSearchView(APIView):
-    """
-    GET /api/telephony/numbers/search/?area_code=415
-    ADMIN-only per spec ("Restricted to ADMIN users").
-    """
-
     permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request):
@@ -335,13 +264,6 @@ class NumberSearchView(APIView):
 
 
 class NumberPurchaseView(APIView):
-    """
-    POST /api/telephony/numbers/purchase/
-    Body: {"phone_number": "+14155551234"}
-    ADMIN-only. Orders the number via Telnyx, then creates the local
-    PhoneNumber row (tenant-scoped, monthly_cost recorded for billing).
-    """
-
     permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def post(self, request):
@@ -358,12 +280,6 @@ class NumberPurchaseView(APIView):
             logger.exception("Number purchase failed")
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-        # Telnyx's cost estimate isn't part of the order response — pull it
-        # from the request body if the frontend forwarded what it saw during
-        # search, otherwise fall back to the model default. Cast explicitly
-        # rather than relying on Django's DB round-trip to normalize a raw
-        # string into Decimal — this object may be used (e.g. serialized in
-        # the response below) before any save/refetch would do that for us.
         create_kwargs = {}
         raw_monthly_cost = request.data.get("monthly_cost")
         if raw_monthly_cost:
@@ -384,17 +300,9 @@ class NumberPurchaseView(APIView):
 
 
 class NumberViewSet(TenantModelViewSet):
-    """
-    /api/telephony/numbers/
-
-    GET (list/retrieve): any tenant member — needed so agents can see which
-    number is theirs, and so Company Settings can populate the assignment UI.
-    Write methods (assign a number to an agent, deactivate, etc.): ADMIN only.
-    """
-
     serializer_class = PhoneNumberSerializer
     queryset = PhoneNumber.objects.all().order_by("-purchased_at")
-    agent_owner_field = None  # every tenant member can see all of the tenant's numbers
+    agent_owner_field = None
 
     def get_permissions(self):
         if self.request.method in ("POST", "PUT", "PATCH", "DELETE"):

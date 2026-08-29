@@ -13,25 +13,20 @@ import CrmDialerPage from "./pages/CrmDialerView";
 import AgenticProspectorPage from "./pages/AgenticProspector";
 import CompanySettingsPage from "./pages/CompanySettings";
 import LeadsPage from "./pages/LeadsPage";
+import CallLogsPage from "./pages/CallLogsPage";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public marketing site */}
         <Route path="/" element={<MarketingHome />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/contact" element={<ContactPage />} />
 
-        {/* Standalone auth pages — deliberately outside the portal layout,
-            so no sidebar or app UI is ever visible before signing in. */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-        {/* Authenticated portal — everything under /app requires a login
-            and renders inside PortalLayout (sidebar + payment-overdue
-            overlay + the 5-minute idle-logout timer). */}
         <Route
           path="/app"
           element={
@@ -43,6 +38,7 @@ export default function App() {
           <Route index element={<CrmDialerPage />} />
           <Route path="prospector" element={<AgenticProspectorPage />} />
           <Route path="leads" element={<LeadsPage />} />
+          <Route path="call-logs" element={<CallLogsPage />} />
           <Route path="settings" element={<CompanySettingsPage />} />
         </Route>
       </Routes>

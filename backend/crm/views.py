@@ -66,8 +66,11 @@ class InteractionViewSet(TenantModelViewSet):
     """
     /api/interactions/
 
-    Supports ?lead=<id>&type=SMS (used by the CRM's SMS thread) and
-    ?lead=<id>&type=CALL (call history / notes).
+    Supports ?lead=<id>&type=SMS (used by the CRM's SMS thread), ?type=CALL
+    (call history / Call Logs page), and ?phone_number=<id> — the last one
+    lets an ADMIN filter call logs down to a single owned number; an AGENT
+    is already scoped to their own interactions via agent_owner_field, so
+    the number filter simply narrows that further.
 
     Unlike the other TenantModelViewSet subclasses, this one also defaults
     `user` to the requester when the client doesn't supply one — e.g. the
@@ -76,7 +79,7 @@ class InteractionViewSet(TenantModelViewSet):
     """
 
     serializer_class = InteractionSerializer
-    queryset = Interaction.objects.all().order_by("timestamp")
+    queryset = Interaction.objects.all().select_related("lead", "user", "phone_number").order_by("-timestamp")
     agent_owner_field = "user"
 
     def get_queryset(self):
@@ -86,6 +89,8 @@ class InteractionViewSet(TenantModelViewSet):
             qs = qs.filter(lead_id=params["lead"])
         if params.get("type"):
             qs = qs.filter(type=params["type"])
+        if params.get("phone_number"):
+            qs = qs.filter(phone_number_id=params["phone_number"])
         return qs
 
     def perform_create(self, serializer):

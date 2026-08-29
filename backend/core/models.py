@@ -20,7 +20,6 @@ class Tenant(models.Model):
 
     class BillingMode(models.TextChoices):
         MANUAL = "MANUAL", "Manual"
-        # Reserved for Version 2.0+ automated gateways (Safepay, PayFast, Stripe).
 
     company_name = models.CharField(max_length=255)
     subscription_status = models.CharField(
@@ -85,11 +84,6 @@ class PhoneNumber(models.Model):
     phone_number = models.CharField(max_length=32, unique=True)
     telnyx_order_id = models.CharField(max_length=128, blank=True)
     is_active = models.BooleanField(default=True)
-    # Per-number monthly cost (from Telnyx's available-number search result at
-    # purchase time) — billing.tasks.generate_monthly_invoices sums this
-    # across a tenant's active numbers into each month's invoice, so a
-    # tenant's bill tracks how many numbers they held THAT month, not just a
-    # flat subscription fee.
     monthly_cost = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("1.00"))
     purchased_at = models.DateTimeField(auto_now_add=True)
 
@@ -176,6 +170,13 @@ class Interaction(models.Model):
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="interactions")
     type = models.CharField(max_length=10, choices=Type.choices)
     direction = models.CharField(max_length=10, choices=Direction.choices)
+    # Which of the tenant's owned numbers this call/SMS went through — lets
+    # the boss filter call logs by number (see crm.views.InteractionViewSet).
+    # SET_NULL rather than CASCADE: a number can be deactivated/sold later
+    # without wiping out the historical log entries that used it.
+    phone_number = models.ForeignKey(
+        PhoneNumber, on_delete=models.SET_NULL, null=True, blank=True, related_name="interactions"
+    )
     duration_seconds = models.PositiveIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True)
     message_body = models.TextField(null=True, blank=True)
@@ -233,13 +234,8 @@ class ScrapeTask(models.Model):
     def __str__(self):
         return f"{self.query} ({self.status})"
 
-class LeadUploadTask(models.Model):
-    """
-    Tracks one bulk CSV/Excel upload job. Mirrors ScrapeTask's PENDING ->
-    COMPLETED/FAILED pattern (same polling approach on the frontend) since a
-    large file is processed in the background, not while the request waits.
-    """
 
+class LeadUploadTask(models.Model):
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
         COMPLETED = "COMPLETED", "Completed"

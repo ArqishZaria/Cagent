@@ -1,5 +1,6 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { TelnyxRTCContext, useNotification } from "@telnyx/react-client";
+import api from "../lib/api";
 
 function normalizeToE164(phoneNumber) {
   const digits = (phoneNumber || "").replace(/\D/g, "");
@@ -8,24 +9,116 @@ function normalizeToE164(phoneNumber) {
   return `+${withCountryCode}`;
 }
 
+const ENDED_STATES = ["hangup", "destroy", "purge"];
+
+/**
+ * useTelnyxCall — central call state, shared by LeadChatPanel (to start
+ * calls) and CallWidget (to render/control them).
+ *
+ * Only one call is ever "primary" (shown/controllable) at a time. If a
+ * second call rings in while one is active, it's offered as a WhatsApp-style
+ * "waiting call" — accepting it hangs up the current call first; declining
+ * it rejects the new one and leaves the current call untouched. A third
+ * simultaneous call is auto-declined outright.
+ *
+ * Outbound calls (started via startCall, always tied to a lead) are logged
+ * to /api/interactions/ on hangup. Inbound calls are already logged
+ * server-side by telephony.views.VoiceWebhookView, so they're not
+ * double-logged here.
+ */
 export default function useTelnyxCall() {
   const client = useContext(TelnyxRTCContext);
   const notification = useNotification();
-  const activeCall = notification?.call;
+  const incomingCall = notification?.call;
 
+  const primaryCallRef = useRef(null);
+  const waitingCallRef = useRef(null);
+  const callMetaRef = useRef(null); // { leadId, fromNumberId } for the primary call, if outbound
+  const elapsedRef = useRef(0);
+
+  const [activeCall, setActiveCall] = useState(null);
+  const [waitingCall, setWaitingCall] = useState(null);
   const [muted, setMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
-  const callState = activeCall?.state; // 'new' | 'ringing' | 'active' | 'hangup' | ...
+  const logCall = (call, meta, durationSeconds) => {
+    if (!meta?.leadId) return; // no lead context (e.g. inbound) — server already logged it
+    api
+      .post("/api/interactions/", {
+        lead: meta.leadId,
+        type: "CALL",
+        direction: call?.direction === "inbound" ? "INBOUND" : "OUTBOUND",
+        duration_seconds: Math.max(0, Math.round(durationSeconds || 0)),
+        phone_number: meta.fromNumberId || null,
+      })
+      .catch(() => {
+        /* best-effort — a missed log entry shouldn't interrupt the call flow */
+      });
+  };
+
+  useEffect(() => {
+    if (!incomingCall) return;
+    const isEnded = ENDED_STATES.includes(incomingCall.state);
+
+    // Event for the call we're currently tracking as primary.
+    if (primaryCallRef.current && primaryCallRef.current.id === incomingCall.id) {
+      if (isEnded) {
+        logCall(incomingCall, callMetaRef.current, elapsedRef.current);
+        primaryCallRef.current = null;
+        callMetaRef.current = null;
+        setActiveCall(null);
+      } else {
+        setActiveCall(incomingCall);
+      }
+      return;
+    }
+
+    // Event for the call currently waiting in the wings.
+    if (waitingCallRef.current && waitingCallRef.current.id === incomingCall.id) {
+      if (isEnded) {
+        waitingCallRef.current = null;
+        setWaitingCall(null);
+      } else {
+        setWaitingCall(incomingCall);
+      }
+      return;
+    }
+
+    if (isEnded) return; // an id we never tracked, already over — ignore
+
+    if (primaryCallRef.current) {
+      if (waitingCallRef.current) {
+        // Already juggling a primary + one waiting call — decline a third.
+        try {
+          incomingCall.reject ? incomingCall.reject() : incomingCall.hangup?.();
+        } catch {
+          /* best-effort */
+        }
+        return;
+      }
+      waitingCallRef.current = incomingCall;
+      setWaitingCall(incomingCall);
+      return;
+    }
+
+    primaryCallRef.current = incomingCall;
+    setActiveCall(incomingCall);
+  }, [incomingCall]);
+
+  const callState = activeCall?.state;
   const inCall = callState === "active" || callState === "ringing" || callState === "new";
   const isIncomingRing = activeCall?.direction === "inbound" && callState === "ringing";
 
   useEffect(() => {
     if (callState !== "active") {
+      elapsedRef.current = 0;
       setElapsed(0);
       return;
     }
-    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    const id = setInterval(() => {
+      elapsedRef.current += 1;
+      setElapsed(elapsedRef.current);
+    }, 1000);
     return () => clearInterval(id);
   }, [callState]);
 
@@ -33,8 +126,10 @@ export default function useTelnyxCall() {
     if (!activeCall) setMuted(false);
   }, [activeCall]);
 
-  const startCall = ({ destinationNumber, fromNumber, callerName }) => {
+  const startCall = ({ destinationNumber, fromNumber, fromNumberId, callerName, leadId }) => {
     if (!client || !destinationNumber || !fromNumber) return;
+    if (primaryCallRef.current) return; // already on a call — refuse to start a second
+    callMetaRef.current = { leadId, fromNumberId };
     client.newCall({
       destinationNumber: normalizeToE164(destinationNumber),
       callerNumber: fromNumber,
@@ -44,11 +139,59 @@ export default function useTelnyxCall() {
 
   const answer = () => activeCall?.answer();
   const hangup = () => activeCall?.hangup();
+
+  const acceptWaiting = () => {
+    const incoming = waitingCallRef.current;
+    if (!incoming) return;
+    waitingCallRef.current = null;
+    setWaitingCall(null);
+
+    if (primaryCallRef.current) {
+      try {
+        primaryCallRef.current.hangup();
+      } catch {
+        /* best-effort */
+      }
+    }
+
+    primaryCallRef.current = incoming;
+    callMetaRef.current = null; // inbound — no lead/number context to log client-side
+    setActiveCall(incoming);
+    incoming.answer();
+  };
+
+  const declineWaiting = () => {
+    const incoming = waitingCallRef.current;
+    if (!incoming) return;
+    waitingCallRef.current = null;
+    setWaitingCall(null);
+    try {
+      incoming.reject ? incoming.reject() : incoming.hangup?.();
+    } catch {
+      /* best-effort */
+    }
+  };
+
   const toggleMute = () => {
     if (!activeCall) return;
     muted ? activeCall.unmuteAudio?.() : activeCall.muteAudio?.();
     setMuted((m) => !m);
   };
 
-  return { client, activeCall, callState, inCall, isIncomingRing, muted, elapsed, startCall, answer, hangup, toggleMute };
+  return {
+    client,
+    activeCall,
+    callState,
+    inCall,
+    isIncomingRing,
+    muted,
+    elapsed,
+    waitingCall,
+    startCall,
+    answer,
+    hangup,
+    acceptWaiting,
+    declineWaiting,
+    toggleMute,
+  };
 }

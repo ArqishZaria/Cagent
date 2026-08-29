@@ -9,24 +9,27 @@ export default function CrmDialerPage() {
   const [leads, setLeads] = useState([]);
   const [leadsLoaded, setLeadsLoaded] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState(null);
-  const [fromNumber, setFromNumber] = useState(null);
+  const [fromNumber, setFromNumber] = useState(null); // { id, phone_number } once loaded
   const location = useLocation();
 
   useEffect(() => {
-    api.get("/api/leads/").then((res) => {
-      const data = res.data?.results || res.data || [];
-      setLeads(data);
-      const requestedLeadId = location.state?.leadId;
-      if (requestedLeadId && data.some((l) => l.id === requestedLeadId)) {
-        setActiveLeadId(requestedLeadId);
-      } else if (data.length) {
-        setActiveLeadId(data[0].id);
-      }
-    }).finally(() => setLeadsLoaded(true));
+    api
+      .get("/api/leads/")
+      .then((res) => {
+        const data = res.data?.results || res.data || [];
+        setLeads(data);
+        const requestedLeadId = location.state?.leadId;
+        if (requestedLeadId && data.some((l) => l.id === requestedLeadId)) {
+          setActiveLeadId(requestedLeadId);
+        } else if (data.length) {
+          setActiveLeadId(data[0].id);
+        }
+      })
+      .finally(() => setLeadsLoaded(true));
 
     api.get("/api/telephony/numbers/").then((res) => {
       const owned = res.data?.results || res.data || [];
-      if (owned.length) setFromNumber(owned[0].phone_number);
+      if (owned.length) setFromNumber({ id: owned[0].id, phone_number: owned[0].phone_number });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
