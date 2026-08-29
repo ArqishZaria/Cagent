@@ -13,6 +13,8 @@ import AgenticProspectorPage from "./pages/AgenticProspector";
 import CompanySettingsPage from "./pages/CompanySettings";
 import LeadsPage from "./pages/LeadsPage";
 import CallLogsPage from "./pages/CallLogsPage";
+import UploadFinancePage from "./pages/UploadFinance";
+import TrackFinancesPage from "./pages/TrackFinances";
 
 export default function App() {
   return (
@@ -22,8 +24,6 @@ export default function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/contact" element={<ContactPage />} />
-        <Route path="finance/upload" element={<UploadFinancePage />} />
-        <Route path="finance/track" element={<TrackFinancesPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
@@ -40,6 +40,8 @@ export default function App() {
           <Route path="leads" element={<LeadsPage />} />
           <Route path="call-logs" element={<CallLogsPage />} />
           <Route path="settings" element={<CompanySettingsPage />} />
+          <Route path="finance/upload" element={<UploadFinancePage />} />
+          <Route path="finance/track" element={<TrackFinancesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

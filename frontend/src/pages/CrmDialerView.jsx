@@ -12,9 +12,9 @@ export default function CrmDialerPage() {
   const [fromNumber, setFromNumber] = useState(null); // { id, phone_number } once loaded
   const location = useLocation();
 
-  useEffect(() => {
+    useEffect(() => {
     api
-      .get("/api/leads/")
+      .get("/api/leads/", { params: { contacted: true } })
       .then((res) => {
         const data = res.data?.results || res.data || [];
         setLeads(data);
@@ -45,7 +45,9 @@ export default function CrmDialerPage() {
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {leadsLoaded && leads.length === 0 && (
-            <p className="text-xs text-ink-400 px-3 py-6 text-center">No leads yet.</p>
+            <p className="text-xs text-ink-400 px-3 py-6 text-center leading-relaxed">
+              Empty until you contact someone. Press "Contact" on a lead in the Leads List tab to start a chat here.
+            </p>
           )}
           {leads.map((lead) => (
             <LeadListItem

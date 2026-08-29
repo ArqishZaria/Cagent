@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, ClipboardList, PhoneCall, ScrollText, Sparkles } from "lucide-react";
+import { Building2, ClipboardList, LineChart, PhoneCall, ScrollText, Sparkles, Wallet } from "lucide-react";
 import { onPaymentRequired } from "../lib/api";
 import PaymentOverdueOverlay from "./PaymentOverdueOverlay";
 import useIdleLogout from "../hooks/useIdleLogout";
@@ -8,9 +8,9 @@ import AppTelnyxProvider from "../lib/TelnyxProvider";
 import CallWidget from "./CallWidget";
 
 const NAV_ITEMS = [
+  { to: "/app/prospector", label: "Scraper", icon: Sparkles },
+  { to: "/app/leads", label: "Leads List", icon: ClipboardList },
   { to: "/app", label: "CRM & dialer", icon: PhoneCall },
-  { to: "/app/prospector", label: "Prospector", icon: Sparkles },
-  { to: "/app/leads", label: "Leads", icon: ClipboardList },
   { to: "/app/call-logs", label: "Call logs", icon: ScrollText },
   { to: "/app/settings", label: "Company settings", icon: Building2 },
   { to: "/app/finance/upload", label: "Upload finance", icon: Wallet },
@@ -39,12 +39,6 @@ export default function PortalLayout() {
   );
 }
 
-/**
- * SideNav — WhatsApp-Web-style icon rail: thin, icon-only, with the label
- * appearing as a tooltip on hover rather than always-visible text. Each item
- * is wrapped in a `group` so the tooltip (absolutely positioned, hidden by
- * default) can react to hovering its parent via group-hover.
- */
 function SideNav() {
   return (
     <nav className="w-16 shrink-0 border-r border-paper-200 bg-white hidden md:flex flex-col items-center py-5 gap-1">
@@ -66,10 +60,6 @@ function SideNav() {
           }
         >
           <Icon size={19} strokeWidth={2} />
-
-          {/* Tooltip — hidden by default, revealed on hover of the parent
-              NavLink via group-hover. Positioned to the right of the rail,
-              with a small arrow-less pointer effect via negative margin. */}
           <span
             className="pointer-events-none absolute left-full ml-3 whitespace-nowrap
                        rounded-md bg-ink-900 px-2.5 py-1.5 text-xs font-medium text-white
