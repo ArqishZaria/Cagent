@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Download, Loader2, Wallet } from "lucide-react";
 import api from "../lib/api";
 import { useWallet } from "../lib/wallet";
-import QRCode from "qrcode.react"
+import { QRCodeSVG } from "qrcode.react";
 
 const POLL_MS = 3000;
 const PRESETS = [10, 25, 50, 100];
@@ -143,7 +143,7 @@ export default function UploadFinancePage() {
               <p className="text-sm text-ink-600 mb-4">Scan with any banking app (Raast) to complete payment</p>
               <div className="inline-block p-4 bg-white border border-paper-300 rounded-xl mb-3">
                 {/* qr_payload is a raw Raast QR string — render via any qrcode lib, e.g. `qrcode.react` */}
-                <QRCode value={topup.qr_payload} size={200} />
+                <QRCodeSVG value={topup.qr_payload} size={200} />
               </div>
               <p className="font-mono text-sm text-ink-900">Rs. {topup.total_charged_pkr}</p>
               <p className="text-xs text-ink-400 mt-1">Expires {new Date(topup.expires_at).toLocaleTimeString()}</p>
