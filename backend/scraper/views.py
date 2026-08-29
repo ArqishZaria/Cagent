@@ -16,6 +16,8 @@ from core.models import CustomUser, Lead, LeadUploadTask, ScrapeTask
 from core.permissions import IsTenantMember
 from crm.serializers import LeadSerializer
 from scraper.tasks import process_lead_upload, run_lead_scrape
+from wallet.models import PricingRate
+from wallet.services import InsufficientBalance, bill_lead_search, require_balance
 
 ALLOWED_UPLOAD_EXTENSIONS = (".csv", ".xlsx", ".xls")
 
@@ -45,9 +47,11 @@ class ScrapeSearchView(APIView):
     POST /api/scraper/search/
     Body: {"query": "roofing companies in Austin TX"}
 
-    Rate-limited to 5 searches per user per hour. block=False (rather than
-    letting django-ratelimit raise) so we control the response shape and
-    return a clean 429 instead of an unhandled exception.
+    Rate-limited to 5 searches per user per hour, AND gated on wallet
+    balance ($0.50/search per PricingRate.Key.LEAD_SEARCH_PER_QUERY) — the
+    balance check happens before the ScrapeTask is even created, so a
+    tenant with insufficient funds never queues (and never gets charged
+    for) a search that can't run.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -63,12 +67,25 @@ class ScrapeSearchView(APIView):
         if not query:
             return Response({"detail": "query is required."}, status=status.HTTP_400_BAD_REQUEST)
 
+        cost = PricingRate.get_cost(PricingRate.Key.LEAD_SEARCH_PER_QUERY)
+        try:
+            require_balance(request.user.tenant, cost)
+        except InsufficientBalance as exc:
+            return Response(
+                {
+                    "detail": f"Insufficient wallet balance for a search (need ${exc.required}, have ${exc.available}).",
+                    "code": "insufficient_balance",
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
         scrape_task = ScrapeTask.objects.create(
             tenant=request.user.tenant,
             requested_by=request.user,
             query=query,
             status=ScrapeTask.Status.PENDING,
         )
+        bill_lead_search(request.user.tenant, scrape_task)
         run_lead_scrape.delay(scrape_task.id)
 
         return Response(
@@ -81,10 +98,9 @@ class ExistingLeadsSearchView(APIView):
     """
     GET /api/scraper/existing-leads/?query=roofing austin
 
-    Instant text search across the tenant's OWN lead database — called
-    right when a Prospector search is submitted, so leads already found in
-    a past search show up immediately, before (and independent of) the
-    slower background web scrape for anything new.
+    Instant text search against leads already in the tenant's database —
+    NOT billed, since it's not the $0.50 web-scrape action, just a local
+    DB lookup that runs alongside it (see AgenticProspector.jsx Stage 1).
 
     Ownership rule matches the rest of the CRM (LeadViewSet): an AGENT only
     sees their own leads here (what they personally found or uploaded); an
@@ -122,9 +138,10 @@ class LeadUploadView(APIView):
     POST /api/scraper/upload/  (multipart/form-data, field name "file")
 
     Accepts a .csv or .xlsx file, saves it to a temp folder, and queues
-    background processing (scraper.tasks.process_lead_upload) — the same
-    "kick off a background job, poll for status" pattern as the web
-    scraper, since a large spreadsheet shouldn't make the request wait.
+    background processing (scraper.tasks.process_lead_upload). Not billed
+    directly — any per-row enrichment scrape inside process_lead_upload
+    that hits the same $0-cost pipeline as the Prospector isn't currently
+    metered; flag if you want a per-row or per-upload charge added here too.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]

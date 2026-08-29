@@ -13,6 +13,8 @@ const NAV_ITEMS = [
   { to: "/app/leads", label: "Leads", icon: ClipboardList },
   { to: "/app/call-logs", label: "Call logs", icon: ScrollText },
   { to: "/app/settings", label: "Company settings", icon: Building2 },
+  { to: "/app/finance/upload", label: "Upload finance", icon: Wallet },
+  { to: "/app/finance/track", label: "Track finances", icon: LineChart },
 ];
 
 export default function PortalLayout() {

@@ -22,7 +22,8 @@ export default function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/contact" element={<ContactPage />} />
-
+        <Route path="finance/upload" element={<UploadFinancePage />} />
+        <Route path="finance/track" element={<TrackFinancesPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 

@@ -21,6 +21,8 @@ from telephony.services import (
     send_sms,
 )
 from telephony.webhook_utils import verify_telnyx_webhook
+from wallet.models import PricingRate, TenantWallet
+from wallet.services import InsufficientBalance, bill_call, bill_sms, count_sms_segments, require_balance
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +50,23 @@ def _sms_to_number(payload):
 
 
 class WebRTCCredentialsView(APIView):
+    """
+    Gated on wallet balance: a tenant at $0 or below simply can't get a
+    WebRTC login token, so the dialer never even connects. Per-second call
+    cost is still billed at hangup (see bill_call below) — this gate only
+    stops calling from starting at all once the wallet is empty.
+    """
+
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def post(self, request):
+        wallet, _ = TenantWallet.objects.get_or_create(tenant=request.user.tenant)
+        if wallet.balance_usd <= 0:
+            return Response(
+                {"detail": "Wallet balance is $0 — top up to enable calling.", "code": "insufficient_balance"},
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
         try:
             token = generate_webrtc_jwt(request.user)
         except TelnyxAPIError as exc:
@@ -112,7 +128,7 @@ class VoiceWebhookView(APIView):
             lead=lead,
             type=Interaction.Type.CALL,
             direction=Interaction.Direction.INBOUND,
-            phone_number=phone_number,  # <-- added: attributes this log entry to the number that rang
+            phone_number=phone_number,
         )
         cache.set(f"telnyx:call_interaction:{call_control_id}", interaction.id, timeout=3600)
 
@@ -136,8 +152,21 @@ class VoiceWebhookView(APIView):
         Interaction.objects.filter(id=interaction_id).update(duration_seconds=duration)
         cache.delete(cache_key)
 
+        # Bill the wallet for this call now that we know its real duration.
+        # bill_call() is idempotent (checks for an existing WalletTransaction
+        # tied to this interaction), so a retried/duplicate webhook can't
+        # double-charge.
+        interaction = Interaction.objects.select_related("tenant", "phone_number").get(id=interaction_id)
+        bill_call(interaction)
+
 
 class SMSSendView(APIView):
+    """
+    Checks wallet balance BEFORE sending (so we never pay Telnyx for a
+    message we then can't bill for), then bills the actual segment count
+    after a successful send.
+    """
+
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def post(self, request):
@@ -166,6 +195,18 @@ class SMSSendView(APIView):
             PhoneNumber, phone_number=from_number, tenant=request.user.tenant, is_active=True
         )
 
+        estimated_cost = PricingRate.get_cost(PricingRate.Key.SMS_PER_SEGMENT) * count_sms_segments(message)
+        try:
+            require_balance(request.user.tenant, estimated_cost)
+        except InsufficientBalance as exc:
+            return Response(
+                {
+                    "detail": f"Insufficient wallet balance (need ${exc.required}, have ${exc.available}).",
+                    "code": "insufficient_balance",
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
         try:
             send_sms(sender_number.phone_number, lead.phone_number, message)
         except telnyx.error.TelnyxError as exc:
@@ -179,8 +220,9 @@ class SMSSendView(APIView):
             type=Interaction.Type.SMS,
             direction=Interaction.Direction.OUTBOUND,
             message_body=message,
-            phone_number=sender_number,  # <-- added
+            phone_number=sender_number,
         )
+        bill_sms(interaction)
 
         return Response(
             {"id": interaction.id, "status": "sent"},
@@ -235,15 +277,21 @@ class SMSWebhookView(APIView):
             lead.do_not_contact = True
             lead.save(update_fields=["do_not_contact"])
 
-        Interaction.objects.create(
+        interaction = Interaction.objects.create(
             tenant=tenant,
             user=assigned_user,
             lead=lead,
             type=Interaction.Type.SMS,
             direction=Interaction.Direction.INBOUND,
             message_body=text,
-            phone_number=phone_number,  # <-- added
+            phone_number=phone_number,
         )
+        # Inbound SMS is billed too — Telnyx charges for receiving, not just
+        # sending. No balance pre-check here since we can't refuse to
+        # *receive* a text; if this dips a tenant below $0, the low-balance
+        # notification (fired from bill_usage -> WalletTransaction.apply)
+        # still goes out.
+        bill_sms(interaction)
 
 
 class NumberSearchView(APIView):

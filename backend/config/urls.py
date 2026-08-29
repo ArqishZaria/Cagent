@@ -12,5 +12,6 @@ urlpatterns = [
     path("api/telephony/", include("telephony.urls")),
     path("api/scraper/", include("scraper.urls")),
     path("api/support/", include("support.urls")),
-    path("api/", include("crm.urls")),  # -> /api/leads/, /api/interactions/
+    path("api/", include("crm.urls")), 
+    path("api/wallet/", include("wallet.urls")),
 ]

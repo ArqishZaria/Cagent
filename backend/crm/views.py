@@ -98,4 +98,8 @@ class InteractionViewSet(TenantModelViewSet):
         serializer.validated_data.pop("tenant", None)
         serializer.validated_data.pop("tenant_id", None)
         assigned_user = serializer.validated_data.get("user") or user
-        serializer.save(tenant=user.tenant, user=assigned_user)
+        instance = serializer.save(tenant=user.tenant, user=assigned_user)
+
+        if instance.type == instance.Type.CALL and instance.duration_seconds:
+            from wallet.services import bill_call
+            bill_call(instance)

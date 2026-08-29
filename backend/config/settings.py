@@ -6,10 +6,12 @@ Stack: Django + Django REST Framework + PostgreSQL + Celery/Redis + Telnyx + Gem
 
 import os
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import dj_database_url
 import telnyx
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -56,13 +58,13 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_celery_beat",
     # Local apps
-    "core",  # Tenant, CustomUser, Lead, Interaction, PhoneNumber, Invoice, SupportMessage, ScrapeTask
+    "core",  # Tenant, CustomUser, Lead, Interaction, PhoneNumber, SupportMessage, ScrapeTask
     "users",  # Employee management (ADMIN creates AGENT accounts)
     "telephony",  # Telnyx WebRTC, voice, and SMS webhooks
-    "billing",  # Monthly invoicing Celery task
     "scraper",  # $0 Agentic Lead Generation
     "crm",  # Lead + Interaction API (list/detail/create for the CRM UI)
     "support",  # Boss-only support chat
+    "wallet",  # prepaid wallet, Raast top-ups, usage billing (replaces the old "billing" app)
 ]
 
 MIDDLEWARE = [
@@ -74,7 +76,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "core.middleware.IsSubscriptionActive",
+    # Note: core.middleware.IsSubscriptionActive is REMOVED — billing is now
+    # enforced per-action (see wallet.services.require_balance() call sites
+    # in telephony/scraper views) rather than a global 402 lockout.
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -201,9 +205,9 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # DB on startup, so this is the single source of truth for periodic tasks —
 # no separate admin step needed to create them.
 CELERY_BEAT_SCHEDULE = {
-    "generate-monthly-invoices": {
-        "task": "billing.tasks.generate_monthly_invoices",
-        "schedule": timedelta(days=30),
+    "charge-monthly-number-rentals": {
+        "task": "wallet.tasks.charge_monthly_number_rentals",
+        "schedule": crontab(day_of_month=1, hour=3, minute=0),  # 3am on the 1st, not a rolling 30 days
     },
 }
 
@@ -219,7 +223,7 @@ CACHES = {
 RATELIMIT_USE_CACHE = "default"
 
 # ------------------------------------------------------------------------------------
-# Third-party API keys (Telnyx / Gemini) — consumed by later-phase apps
+# Third-party API keys (Telnyx / Gemini)
 # ------------------------------------------------------------------------------------
 
 TELNYX_API_KEY = os.environ.get("TELNYX_API_KEY", "")
@@ -235,7 +239,24 @@ TELNYX_MESSAGING_PROFILE_ID = os.environ.get("TELNYX_MESSAGING_PROFILE_ID", "")
 telnyx.api_key = TELNYX_API_KEY
 
 # ------------------------------------------------------------------------------------
-# Email (used by the monthly invoicing task)
+# Wallet / prepaid billing (Raast top-ups + usage deduction)
+# ------------------------------------------------------------------------------------
+
+WALLET_GATEWAY_CLASS = "wallet.gateways.payfast.PayFastGateway"
+PAYFAST_MERCHANT_ID = os.environ.get("PAYFAST_MERCHANT_ID", "")
+PAYFAST_SECURED_KEY = os.environ.get("PAYFAST_SECURED_KEY", "")
+PAYFAST_API_BASE = os.environ.get("PAYFAST_API_BASE", "https://ipg1.apps.net.pk/api")
+PAYFAST_WEBHOOK_URL = os.environ.get(
+    "PAYFAST_WEBHOOK_URL", "https://api.yourdomain.com/api/wallet/webhooks/payfast/"
+)
+PAYFAST_GATEWAY_FEE_PERCENT = Decimal(os.environ.get("PAYFAST_GATEWAY_FEE_PERCENT", "0.0068"))
+
+FX_RATE_API_URL = os.environ.get("FX_RATE_API_URL", "https://open.er-api.com/v6/latest/USD")
+
+PLATFORM_OWNER_NOTIFICATION_EMAILS = env_list("PLATFORM_OWNER_NOTIFICATION_EMAILS", "")
+
+# ------------------------------------------------------------------------------------
+# Email (top-up / low-balance notifications)
 # ------------------------------------------------------------------------------------
 
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
@@ -245,18 +266,6 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "billing@yourdomain.com")
-
-# ------------------------------------------------------------------------------------
-# Manual billing — monthly amount + Bank AL Habib transfer details shown on
-# every invoice email / SupportMessage. All plaintext, no gateway involved
-# (this is Version 1's manual billing_mode; see Part 7 roadmap for gateways).
-# ------------------------------------------------------------------------------------
-
-MONTHLY_SUBSCRIPTION_AMOUNT = os.environ.get("MONTHLY_SUBSCRIPTION_AMOUNT", "5000.00")
-BANK_NAME = os.environ.get("BANK_NAME", "Bank AL Habib")
-BANK_ACCOUNT_TITLE = os.environ.get("BANK_ACCOUNT_TITLE", "Your Company Name")
-BANK_ACCOUNT_NUMBER = os.environ.get("BANK_ACCOUNT_NUMBER", "")
-BANK_IBAN = os.environ.get("BANK_IBAN", "")
 
 # ------------------------------------------------------------------------------------
 # Production security hardening (only enforced when DEBUG=False)
