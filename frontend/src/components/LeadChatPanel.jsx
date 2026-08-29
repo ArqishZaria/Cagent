@@ -17,9 +17,14 @@ const STATUS_COLORS = {
  * continuous 2-way SMS thread below. `fromNumber` is { id, phone_number }
  * so the call icon can pass fromNumberId through for call-log attribution
  * (see useTelnyxCall's logCall()).
+ *
+ * callLead now checks wallet balance via useTelnyxCall's startCall (which
+ * hits /api/telephony/calls/check-balance/ before ever dialing) — callError
+ * surfaces the 402 inline, right under the header, same spot the SMS error
+ * shows up near the composer.
  */
 export default function LeadChatPanel({ lead, fromNumber }) {
-  const { startCall, activeCall } = useTelnyxCall();
+  const { startCall, activeCall, callError } = useTelnyxCall();
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -69,9 +74,9 @@ export default function LeadChatPanel({ lead, fromNumber }) {
     }
   };
 
-  const callLead = () => {
+  const callLead = async () => {
     if (!lead?.phone_number || !fromNumber) return;
-    startCall({
+    await startCall({
       destinationNumber: lead.phone_number,
       fromNumber: fromNumber.phone_number,
       fromNumberId: fromNumber.id,
@@ -123,6 +128,12 @@ export default function LeadChatPanel({ lead, fromNumber }) {
           )}
         </div>
       </div>
+
+      {callError && (
+        <div className="px-5 py-2 border-b border-paper-200 bg-alert/5 text-xs text-alert">
+          {callError}
+        </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3 bg-paper-50/60">
         {messages.length === 0 && <p className="text-xs text-ink-400">No messages yet.</p>}

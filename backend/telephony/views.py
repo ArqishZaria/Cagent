@@ -76,6 +76,35 @@ class WebRTCCredentialsView(APIView):
         return Response({"login_token": token})
 
 
+class CallEligibilityView(APIView):
+    """
+    POST /api/telephony/calls/check-balance/
+
+    The frontend hits this right before dialing (useTelnyxCall.startCall),
+    so an outbound call never even rings if the wallet can't cover at least
+    one minute at the outbound rate — bill_call() always rounds up to a
+    minimum of 1 minute, so that's the real minimum cost of any call.
+    Mirrors the inbound auto-decline gate in
+    VoiceWebhookView._handle_call_initiated below.
+    """
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    def post(self, request):
+        per_minute = PricingRate.get_cost(PricingRate.Key.CALL_OUTBOUND_PER_MINUTE)
+        try:
+            require_balance(request.user.tenant, per_minute)
+        except InsufficientBalance as exc:
+            return Response(
+                {
+                    "detail": f"Insufficient wallet balance for a call (need ${exc.required}, have ${exc.available}).",
+                    "code": "insufficient_balance",
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+        return Response({"ok": True})
+
+
 class VoiceWebhookView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -122,6 +151,33 @@ class VoiceWebhookView(APIView):
             defaults={"status": Lead.Status.NEW, "owner": assigned_user},
         )
 
+        # Balance gate — an inbound call still costs the inbound per-minute
+        # rate at hangup (bill_call rounds up to at least 1 minute), so a
+        # tenant that can't afford that minute can't afford to receive the
+        # call either. Auto-decline instead of routing, and log it as a
+        # missed call so it's visible in Call Logs.
+        per_minute = PricingRate.get_cost(PricingRate.Key.CALL_INBOUND_PER_MINUTE)
+        try:
+            require_balance(tenant, per_minute)
+        except InsufficientBalance:
+            logger.info(
+                "Auto-declining inbound call to %s — insufficient balance for tenant %s",
+                to_number, tenant.company_name,
+            )
+            Interaction.objects.create(
+                tenant=tenant,
+                user=assigned_user,
+                lead=lead,
+                type=Interaction.Type.CALL,
+                direction=Interaction.Direction.INBOUND,
+                phone_number=phone_number,
+                duration_seconds=0,
+                missed=True,
+                notes="Auto-declined — insufficient wallet balance.",
+            )
+            self._decline_call(call_control_id)
+            return
+
         interaction = Interaction.objects.create(
             tenant=tenant,
             user=assigned_user,
@@ -141,6 +197,11 @@ class VoiceWebhookView(APIView):
         call = telnyx.Call()
         call.call_control_id = call_control_id
         call.transfer(to=f"sip:{assigned_user.username}@sip.telnyx.com")
+
+    def _decline_call(self, call_control_id):
+        call = telnyx.Call()
+        call.call_control_id = call_control_id
+        call.hangup()
 
     def _handle_call_hangup(self, payload, call_control_id):
         cache_key = f"telnyx:call_interaction:{call_control_id}"

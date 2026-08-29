@@ -20,7 +20,6 @@ class InteractionSerializer(serializers.ModelSerializer):
         model = Interaction
         fields = (
             "id", "lead", "user", "type", "direction",
-            "duration_seconds", "notes", "message_body", "timestamp",
+            "duration_seconds", "notes", "message_body", "missed", "timestamp",
         )
-        read_only_fields = ("id", "timestamp")
-
+        read_only_fields = ("id", "missed", "timestamp")

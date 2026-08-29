@@ -16,28 +16,11 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// --- 402 Payment Required -> global lockout overlay ---------------------------------
-//
-// core.middleware.IsSubscriptionActive (Day 2) returns HTTP 402 for any
-// PAID_OVERDUE tenant hitting a non-whitelisted endpoint. We don't want every
-// call site to handle that individually, so this interceptor catches it once
-// and notifies whoever is listening (App.jsx renders <PaymentOverdueOverlay />
-// when notified). See onPaymentRequired() below.
-
-let paymentRequiredHandler = null;
-
-export function onPaymentRequired(handler) {
-  paymentRequiredHandler = handler;
-}
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 402 && paymentRequiredHandler) {
-      paymentRequiredHandler(error.response.data);
-    }
-    return Promise.reject(error);
-  }
-);
+// Note: there is no longer a global 402 -> full-screen-lockout interceptor.
+// Billing is enforced per-action now (wallet.services.require_balance), and
+// each billable call site handles its own 402 inline — see
+// AgenticProspector.jsx (scraper search), LeadChatPanel.jsx (SMS send), and
+// TelnyxProvider.jsx (WebRTC credentials) for how each surfaces
+// "insufficient_balance" without blocking the rest of the app.
 
 export default api;

@@ -48,6 +48,7 @@ class PricingRate(models.Model):
         NUMBER_SMS_CAPABILITY_FEE = "number_sms_capability_fee", "Phone number — SMS capability add-on (monthly)"
         TEN_DLC_CAMPAIGN_FEE = "ten_dlc_campaign_fee", "10DLC campaign fee (monthly)"
         LEAD_SEARCH_PER_QUERY = "lead_search_per_query", "Prospector web search — per query"
+        LEAD_VERIFICATION_PER_ROW = "lead_verification_per_row", "Bulk upload — per-row verification"
 
     key = models.CharField(max_length=64, choices=Key.choices, unique=True)
     cost_usd = models.DecimalField(max_digits=8, decimal_places=4)
@@ -128,6 +129,7 @@ class WalletTransaction(models.Model):
         USAGE_CALL = "USAGE_CALL", "Call"
         USAGE_SMS = "USAGE_SMS", "SMS"
         USAGE_LEAD_SEARCH = "USAGE_LEAD_SEARCH", "Lead search"
+        USAGE_LEAD_VERIFICATION = "USAGE_LEAD_VERIFICATION", "Lead verification"
         USAGE_NUMBER_RENTAL = "USAGE_NUMBER_RENTAL", "Number rental"
         USAGE_OTHER = "USAGE_OTHER", "Other"
         ADJUSTMENT = "ADJUSTMENT", "Manual adjustment"
@@ -162,6 +164,13 @@ class WalletTransaction(models.Model):
         concurrent debits (e.g. a call hangup and an SMS send landing at
         the same instant) can never race each other into an inconsistent
         balance.
+
+        Low-balance notification fires exactly once per dip: the moment
+        balance first crosses <= threshold, right here where the crossing
+        is actually detected — not left for callers to infer afterward from
+        low_balance_notified_at's truthiness, since that flag stays non-null
+        for the whole duration of the dip and would otherwise fire on every
+        subsequent transaction, not just the first one.
         """
         wallet = TenantWallet.objects.select_for_update().get(tenant=tenant)
         new_balance = wallet.balance_usd + amount_usd
@@ -171,12 +180,18 @@ class WalletTransaction(models.Model):
         )
         wallet.balance_usd = new_balance
 
+        just_crossed_low = False
         if new_balance <= wallet.low_balance_threshold_usd:
             if wallet.low_balance_notified_at is None:
                 wallet.low_balance_notified_at = timezone.now()
-                # low_balance signal fired here in Step 2 (email/notification)
+                just_crossed_low = True
         else:
             wallet.low_balance_notified_at = None
 
         wallet.save(update_fields=["balance_usd", "low_balance_notified_at", "updated_at"])
+
+        if just_crossed_low:
+            from wallet.notifications import notify_low_balance
+            notify_low_balance(wallet)
+
         return txn

@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { Building2, ClipboardList, LineChart, PhoneCall, ScrollText, Sparkles, Wallet } from "lucide-react";
-import { onPaymentRequired } from "../lib/api";
-import PaymentOverdueOverlay from "./PaymentOverdueOverlay";
 import useIdleLogout from "../hooks/useIdleLogout";
 import AppTelnyxProvider from "../lib/TelnyxProvider";
 import CallWidget from "./CallWidget";
+import LowBalanceBanner from "./LowBalanceBanner";
 
 const NAV_ITEMS = [
   { to: "/app/prospector", label: "Scraper", icon: Sparkles },
@@ -18,22 +16,19 @@ const NAV_ITEMS = [
 ];
 
 export default function PortalLayout() {
-  const [overdue, setOverdue] = useState(null);
   useIdleLogout();
-
-  useEffect(() => {
-    onPaymentRequired((details) => setOverdue(details));
-  }, []);
 
   return (
     <AppTelnyxProvider>
-      <div className="flex min-h-screen bg-paper-50">
-        <SideNav />
-        <main className="flex-1 min-w-0">
-          <Outlet />
-        </main>
-        {overdue && <PaymentOverdueOverlay details={overdue} invoice={overdue.invoice} />}
-        <CallWidget />
+      <div className="flex min-h-screen bg-paper-50 flex-col">
+        <LowBalanceBanner />
+        <div className="flex flex-1 min-h-0">
+          <SideNav />
+          <main className="flex-1 min-w-0">
+            <Outlet />
+          </main>
+          <CallWidget />
+        </div>
       </div>
     </AppTelnyxProvider>
   );

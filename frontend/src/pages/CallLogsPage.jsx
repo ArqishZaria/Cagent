@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PhoneIncoming, PhoneOutgoing, ScrollText } from "lucide-react";
+import { PhoneIncoming, PhoneMissed, PhoneOutgoing, ScrollText } from "lucide-react";
 import api from "../lib/api";
 
 function formatDuration(seconds) {
@@ -14,6 +14,11 @@ function formatDuration(seconds) {
  * An AGENT already only sees their own interactions (InteractionViewSet's
  * agent_owner_field="user"); an ADMIN sees the whole tenant's calls and can
  * narrow down to one number at a time.
+ *
+ * Inbound calls auto-declined for insufficient wallet balance are logged
+ * with missed=true, duration_seconds=0 (see telephony.views.VoiceWebhookView
+ * ._handle_call_initiated) — shown here with a red missed-call icon and a
+ * "Missed — low balance" label instead of a duration.
  */
 export default function CallLogsPage() {
   const [numbers, setNumbers] = useState([]);
@@ -70,7 +75,7 @@ export default function CallLogsPage() {
 
       <div className="max-w-5xl mx-auto px-6 py-8">
         {loading ? (
-          <p className="text-sm text-ink-400 text-center py-16">Loading…</p>
+          <p className="text-sm text-ink-400 text-center py-16">Loading...</p>
         ) : logs.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-paper-300 rounded-2xl bg-white">
             <p className="text-ink-500 text-sm">No calls logged yet for this number.</p>
@@ -80,7 +85,9 @@ export default function CallLogsPage() {
             {logs.map((log) => (
               <div key={log.id} className="ledger-row !py-3.5 !px-5">
                 <span className="flex items-center gap-3 min-w-0">
-                  {log.direction === "INBOUND" ? (
+                  {log.missed ? (
+                    <PhoneMissed size={14} className="text-alert shrink-0" />
+                  ) : log.direction === "INBOUND" ? (
                     <PhoneIncoming size={14} className="text-live shrink-0" />
                   ) : (
                     <PhoneOutgoing size={14} className="text-signal shrink-0" />
@@ -92,7 +99,9 @@ export default function CallLogsPage() {
                     </span>
                   </span>
                 </span>
-                <span className="shrink-0 text-ink-600">{formatDuration(log.duration_seconds)}</span>
+                <span className={`shrink-0 ${log.missed ? "text-alert font-medium" : "text-ink-600"}`}>
+                  {log.missed ? "Missed — low balance" : formatDuration(log.duration_seconds)}
+                </span>
               </div>
             ))}
           </div>

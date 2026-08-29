@@ -178,16 +178,16 @@ class Interaction(models.Model):
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="interactions")
     type = models.CharField(max_length=10, choices=Type.choices)
     direction = models.CharField(max_length=10, choices=Direction.choices)
-    # Which of the tenant's owned numbers this call/SMS went through — lets
-    # the boss filter call logs by number (see crm.views.InteractionViewSet).
-    # SET_NULL rather than CASCADE: a number can be deactivated/sold later
-    # without wiping out the historical log entries that used it.
     phone_number = models.ForeignKey(
         PhoneNumber, on_delete=models.SET_NULL, null=True, blank=True, related_name="interactions"
     )
     duration_seconds = models.PositiveIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True)
     message_body = models.TextField(null=True, blank=True)
+    missed = models.BooleanField(
+        default=False,
+        help_text="True for inbound calls auto-declined due to insufficient wallet balance.",
+    )
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -195,7 +195,6 @@ class Interaction(models.Model):
 
     def __str__(self):
         return f"{self.type} {self.direction} — {self.lead}"
-
 
 class SupportMessage(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="support_messages")

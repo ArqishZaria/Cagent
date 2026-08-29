@@ -25,6 +25,12 @@ const ENDED_STATES = ["hangup", "destroy", "purge"];
  * to /api/interactions/ on hangup. Inbound calls are already logged
  * server-side by telephony.views.VoiceWebhookView, so they're not
  * double-logged here.
+ *
+ * startCall is now async: it first hits
+ * POST /api/telephony/calls/check-balance/ (telephony.views.CallEligibilityView)
+ * so a call never even rings if the wallet can't cover at least one minute
+ * at the outbound rate. On a 402, `callError` is set and the call never
+ * starts — surfaced by LeadChatPanel right under the lead header.
  */
 export default function useTelnyxCall() {
   const client = useContext(TelnyxRTCContext);
@@ -40,6 +46,7 @@ export default function useTelnyxCall() {
   const [waitingCall, setWaitingCall] = useState(null);
   const [muted, setMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [callError, setCallError] = useState("");
 
   const logCall = (call, meta, durationSeconds) => {
     if (!meta?.leadId) return; // no lead context (e.g. inbound) — server already logged it
@@ -126,9 +133,22 @@ export default function useTelnyxCall() {
     if (!activeCall) setMuted(false);
   }, [activeCall]);
 
-  const startCall = ({ destinationNumber, fromNumber, fromNumberId, callerName, leadId }) => {
+  const startCall = async ({ destinationNumber, fromNumber, fromNumberId, callerName, leadId }) => {
     if (!client || !destinationNumber || !fromNumber) return;
     if (primaryCallRef.current) return; // already on a call — refuse to start a second
+
+    try {
+      await api.post("/api/telephony/calls/check-balance/");
+    } catch (err) {
+      setCallError(
+        err.response?.data?.code === "insufficient_balance"
+          ? "Wallet balance too low to place this call — top up to keep calling."
+          : "Couldn't verify wallet balance. Try again."
+      );
+      return;
+    }
+
+    setCallError("");
     callMetaRef.current = { leadId, fromNumberId };
     client.newCall({
       destinationNumber: normalizeToE164(destinationNumber),
@@ -187,6 +207,7 @@ export default function useTelnyxCall() {
     muted,
     elapsed,
     waitingCall,
+    callError,
     startCall,
     answer,
     hangup,
