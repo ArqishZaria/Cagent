@@ -134,7 +134,15 @@ class Lead(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    contacted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Set the moment someone clicks 'Contact' in the Leads List (or "
+            "logs a call/text directly). This is the ONLY thing that makes "
+            "a lead appear in the CRM/Dialer tab — the tab stays empty until then."
+        ),
+    )
     class Meta:
         ordering = ["-created_at"]
         constraints = [
@@ -227,6 +235,9 @@ class ScrapeTask(models.Model):
     query = models.CharField(max_length=500)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
+    existing_count = models.PositiveIntegerField(default=0)
+    master_pulled_count = models.PositiveIntegerField(default=0)
+    freshly_scraped_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["-created_at"]
@@ -252,9 +263,74 @@ class LeadUploadTask(models.Model):
     updated_count = models.PositiveIntegerField(default=0)
     error_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    failed_rows = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of {row, label, reason} dicts for rows rejected during verification.",
+    )
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.original_filename} ({self.status})"
+    
+class MasterLead(models.Model):
+    """
+    Platform-wide shared pool of VERIFIED leads — never tenant-scoped.
+    Populated two ways: (1) every freshly-scraped Prospector result gets
+    upserted here too, (2) every bulk-upload row that passes web-presence
+    verification gets upserted here too. Random inbound callers/texters are
+    NEVER added — only leads a tenant actively found/verified.
+
+    Dedup is global (by email, then phone) — same rule as Lead's per-tenant
+    dedup in core.lead_dedup, just without the tenant filter.
+    """
+
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
+    job_title = models.CharField(max_length=150, blank=True)
+    company = models.CharField(max_length=255, blank=True)
+    phone_number = models.CharField(max_length=32, blank=True)
+    email = models.EmailField(blank=True)
+    website = models.URLField(blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    keywords = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text="Space-separated search terms this lead matches — powers waterfall lookups.",
+    )
+    do_not_contact = models.BooleanField(
+        default=False,
+        help_text="Global opt-out — propagated the instant ANY tenant's copy of this contact texts STOP.",
+    )
+    source_tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Tenant whose scrape/upload first verified this lead. Informational only — grants no special access.",
+    )
+    verified_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-verified_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=~models.Q(email=""),
+                name="unique_master_email_when_present",
+            ),
+            models.UniqueConstraint(
+                fields=["phone_number"],
+                condition=~models.Q(phone_number=""),
+                name="unique_master_phone_when_present",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.company or self.last_name} ({'blocked' if self.do_not_contact else 'active'})"

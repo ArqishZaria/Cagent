@@ -23,20 +23,18 @@ ALLOWED_UPLOAD_EXTENSIONS = (".csv", ".xlsx", ".xls")
 
 
 class ScrapeTaskStatusView(APIView):
-    """
-    GET /api/scraper/tasks/<id>/
-
-    Polled by the Agentic Prospector UI until status flips to COMPLETED or
-    FAILED. Tenant-scoped — a task belonging to another tenant 404s rather
-    than leaking its existence.
-    """
-
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def get(self, request, pk):
         task = get_object_or_404(ScrapeTask, pk=pk, tenant=request.user.tenant)
-        return Response({"id": task.id, "status": task.status, "query": task.query})
-
+        return Response({
+            "id": task.id,
+            "status": task.status,
+            "query": task.query,
+            "existing_count": task.existing_count,
+            "master_pulled_count": task.master_pulled_count,
+            "freshly_scraped_count": task.freshly_scraped_count,
+        })
 
 @method_decorator(
     ratelimit(key="user", rate="5/h", method="POST", block=False),
@@ -182,20 +180,17 @@ class LeadUploadView(APIView):
 
 
 class LeadUploadStatusView(APIView):
-    """GET /api/scraper/upload-tasks/<id>/ — polled until COMPLETED or FAILED."""
-
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def get(self, request, pk):
         task = get_object_or_404(LeadUploadTask, pk=pk, tenant=request.user.tenant)
-        return Response(
-            {
-                "id": task.id,
-                "status": task.status,
-                "original_filename": task.original_filename,
-                "total_rows": task.total_rows,
-                "created_count": task.created_count,
-                "updated_count": task.updated_count,
-                "error_count": task.error_count,
-            }
-        )
+        return Response({
+            "id": task.id,
+            "status": task.status,
+            "original_filename": task.original_filename,
+            "total_rows": task.total_rows,
+            "created_count": task.created_count,
+            "updated_count": task.updated_count,
+            "error_count": task.error_count,
+            "failed_rows": task.failed_rows,
+        })

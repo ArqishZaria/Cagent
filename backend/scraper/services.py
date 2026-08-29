@@ -129,3 +129,30 @@ def extract_leads_with_gemini(scraped_text: str) -> list[dict]:
         return []
 
     return leads if isinstance(leads, list) else []
+
+def verify_lead_has_web_presence(row: dict) -> tuple[bool, str]:
+    """
+    Bulk-upload verification. If the row has a website, crawl it directly.
+    Otherwise run a quick, cheap search on company + city/state. Returns
+    (found, extracted_text) — found=False means the row gets rejected per
+    the upload spec's "no web presence -> reject" rule.
+    """
+    website = (row.get("website") or "").strip()
+    if website:
+        text = crawl_urls([website])
+        return bool(text.strip()), text
+
+    query = " ".join(p for p in (row.get("company"), row.get("city"), row.get("state")) if p).strip()
+    if not query:
+        return False, ""
+
+    try:
+        urls = search_urls(query, limit=3)
+    except Exception:
+        logger.exception("Verification search failed for %r", query)
+        return False, ""
+    if not urls:
+        return False, ""
+
+    text = crawl_urls(urls[:1])
+    return bool(text.strip()), text

@@ -17,6 +17,7 @@ from core.models import (
     Interaction,
     Invoice,
     Lead,
+    MasterLead,
     PhoneNumber,
     ScrapeTask,
     SupportMessage,
@@ -44,7 +45,13 @@ class PhoneNumberInline(admin.TabularInline):
     readonly_fields = ("telnyx_order_id",)
     show_change_link = True
 
-
+@admin.register(MasterLead)
+class MasterLeadAdmin(admin.ModelAdmin):
+    list_display = ("company", "last_name", "city", "state", "phone_number", "email", "do_not_contact", "source_tenant", "verified_at")
+    list_filter = ("do_not_contact", "state")
+    search_fields = ("company", "first_name", "last_name", "phone_number", "email", "keywords")
+    readonly_fields = ("verified_at", "updated_at")
+    
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
     list_display = (

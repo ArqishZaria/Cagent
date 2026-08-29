@@ -1,5 +1,8 @@
 from django.db.models import Q
+from django.utils import timezone
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 from core.models import Interaction, Lead
 from core.viewsets import TenantModelViewSet
@@ -7,25 +10,9 @@ from crm.serializers import InteractionSerializer, LeadSerializer
 
 
 class LeadViewSet(TenantModelViewSet):
-    """
-    /api/leads/
-
-    Supports optional query-param filtering used by the frontend:
-      ?scrape_task=<id>  — leads produced by one Agentic Prospector search
-      ?status=<STATUS>
-      ?owner=<user_id>
-      ?search=<text>     — matches company, city, state, name, email, or phone
-                           (used by the standing Leads page's search box)
-
-    Ownership rule (per TenantModelViewSet + agent_owner_field below):
-    an AGENT only ever sees leads where owner == themselves — their own
-    personal list. An ADMIN sees every lead in the tenant — the combined
-    team-wide list.
-    """
-
     serializer_class = LeadSerializer
     queryset = Lead.objects.all().order_by("-created_at")
-    agent_owner_field = "owner"  # AGENT only sees their own leads (Day 2 pattern)
+    agent_owner_field = "owner"
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -36,6 +23,10 @@ class LeadViewSet(TenantModelViewSet):
             qs = qs.filter(status=params["status"])
         if params.get("owner"):
             qs = qs.filter(owner_id=params["owner"])
+        if params.get("contacted") == "true":
+            qs = qs.filter(contacted_at__isnull=False)
+        elif params.get("contacted") == "false":
+            qs = qs.filter(contacted_at__isnull=True)
         if params.get("search"):
             search_filter = Q()
             for term in params["search"].split():
@@ -61,23 +52,22 @@ class LeadViewSet(TenantModelViewSet):
             raise ValidationError({"phone_number": "A lead with this phone number already exists."})
         super().perform_create(serializer)
 
+    @action(detail=True, methods=["post"])
+    def contact(self, request, pk=None):
+        """
+        POST /api/leads/<id>/contact/ — the only thing that moves a lead
+        into the CRM/Dialer tab. Idempotent.
+        """
+        lead = self.get_object()
+        if lead.do_not_contact:
+            return Response({"detail": "This lead has opted out and cannot be contacted."}, status=403)
+        if not lead.contacted_at:
+            lead.contacted_at = timezone.now()
+            lead.save(update_fields=["contacted_at"])
+        return Response(LeadSerializer(lead).data)
+
 
 class InteractionViewSet(TenantModelViewSet):
-    """
-    /api/interactions/
-
-    Supports ?lead=<id>&type=SMS (used by the CRM's SMS thread), ?type=CALL
-    (call history / Call Logs page), and ?phone_number=<id> — the last one
-    lets an ADMIN filter call logs down to a single owned number; an AGENT
-    is already scoped to their own interactions via agent_owner_field, so
-    the number filter simply narrows that further.
-
-    Unlike the other TenantModelViewSet subclasses, this one also defaults
-    `user` to the requester when the client doesn't supply one — e.g. the
-    dialer's "save call note" flow POSTs {lead, type, direction, notes}
-    with no user field at all.
-    """
-
     serializer_class = InteractionSerializer
     queryset = Interaction.objects.all().select_related("lead", "user", "phone_number").order_by("-timestamp")
     agent_owner_field = "user"
@@ -99,6 +89,14 @@ class InteractionViewSet(TenantModelViewSet):
         serializer.validated_data.pop("tenant_id", None)
         assigned_user = serializer.validated_data.get("user") or user
         instance = serializer.save(tenant=user.tenant, user=assigned_user)
+
+        # Belt-and-suspenders: if a call/text got logged for a lead that
+        # was never explicitly "Contacted" from the Leads List, mark it now
+        # so it still shows up in the CRM tab.
+        if instance.lead_id and not instance.lead.contacted_at:
+            Lead.objects.filter(id=instance.lead_id, contacted_at__isnull=True).update(
+                contacted_at=timezone.now()
+            )
 
         if instance.type == instance.Type.CALL and instance.duration_seconds:
             from wallet.services import bill_call

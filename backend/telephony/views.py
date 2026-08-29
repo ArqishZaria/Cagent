@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from core.master_lead import propagate_global_opt_out
 from core.models import Interaction, Lead, PhoneNumber
 from core.permissions import IsTenantAdmin, IsTenantMember
 from core.viewsets import TenantModelViewSet
@@ -272,10 +272,10 @@ class SMSWebhookView(APIView):
             phone_number=from_number,
             defaults={"status": Lead.Status.NEW, "owner": assigned_user},
         )
-
         if any(keyword in text.upper() for keyword in STOP_KEYWORDS):
             lead.do_not_contact = True
             lead.save(update_fields=["do_not_contact"])
+            propagate_global_opt_out(phone=lead.phone_number, email=lead.email)
 
         interaction = Interaction.objects.create(
             tenant=tenant,
