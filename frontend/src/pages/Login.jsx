@@ -52,7 +52,6 @@ export default function LoginPage() {
           </div>
           <PasswordInput
             className="input-field"
-            wrapperClassName="mb-5"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
