@@ -27,8 +27,8 @@ export default function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="support" element={<SupportPage />} />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route path="/support" element={<SupportPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
 
         <Route
           path="/app"
