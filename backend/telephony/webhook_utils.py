@@ -3,14 +3,13 @@ Shared Telnyx webhook verification helper.
 
 Telnyx signs every webhook with Ed25519 and sends the signature + timestamp in
 headers. telnyx.Webhook.construct_event() verifies that signature against
-TELNYX_WEBHOOK_SECRET and raises telnyx.error.SignatureVerificationError if it
+Telnyx's public key and raises telnyx.error.SignatureVerificationError if it
 doesn't match (or if the timestamp is outside the allowed tolerance window,
 which guards against replay attacks). Every webhook view in this app must run
 requests through this helper before touching the payload.
 """
 
 import telnyx
-from django.conf import settings
 from rest_framework.exceptions import PermissionDenied
 
 
@@ -35,7 +34,6 @@ def verify_telnyx_webhook(request):
             payload,
             sig_header,
             timestamp_header,
-            settings.TELNYX_WEBHOOK_SECRET,
         )
     except telnyx.error.SignatureVerificationError as exc:
         import logging
