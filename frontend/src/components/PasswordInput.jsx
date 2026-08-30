@@ -17,7 +17,7 @@ export default function PasswordInput({ className = "input-field", wrapperClassN
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-current opacity-50 hover:opacity-100 transition"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-black opacity-50 hover:opacity-100 transition"
         aria-label={visible ? "Hide password" : "Show password"}
         tabIndex={-1}
       >
