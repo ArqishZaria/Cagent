@@ -47,10 +47,10 @@ export default function LoginPage() {
 
           <div className="flex items-center justify-between mb-1.5">
             <label className="mkt-eyebrow">Password</label>
+            <Link to="/forgot-password" className="mkt-link text-xs">Forgot password?</Link>
           </div>
           <input className="mkt-input mb-5" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <Link to="/forgot-password" className="mkt-link text-xs">Forgot password?</Link>
-
+          
           {error && <p className="text-xs text-red-400 mb-4">{error}</p>}
 
           <button type="submit" disabled={loading} className="mkt-btn-primary w-full justify-center">
