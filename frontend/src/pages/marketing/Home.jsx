@@ -1,167 +1,247 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, MessageSquareText, PhoneCall, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, CheckCircle2, Star } from "lucide-react";
 import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
-import AnnouncementBanner from "../../components/marketing/AnnouncementBanner";
-import AmbientBackdrop from "../../components/marketing/AmbientBackdrop";
-import LedgerMockup from "../../components/marketing/LedgerMockup";
-import TrustStrip from "../../components/marketing/TrustStrip";
-import Testimonials from "../../components/marketing/Testimonials";
 import Reveal from "../../components/marketing/Reveal";
+
+const WORDS = ["calling", "texting", "prospecting", "closing"];
+
+function RotatingWord() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((v) => (v + 1) % WORDS.length), 1800);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span className="relative inline-block h-[1.1em] overflow-hidden align-bottom min-w-[7ch] text-left">
+      <span key={i} className="block text-mkt-green animate-word-in">{WORDS[i]}</span>
+    </span>
+  );
+}
+
+function CountUp({ to, decimals = 0, prefix = "", suffix = "" }) {
+  const ref = useRef(null);
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        const start = performance.now();
+        const duration = 1200;
+        const tick = (now) => {
+          const p = Math.min(1, (now - start) / duration);
+          setVal(to * p);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        obs.disconnect();
+      },
+      { threshold: 0.5 }
+    );
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [to]);
+  return <span ref={ref}>{prefix}{val.toFixed(decimals)}{suffix}</span>;
+}
+
+/** Stands in for a hero video: a fully live, looping call simulation. Now glass. */
+function LiveDemoPanel() {
+  const LINES = [
+    "Dialing +1 512 555 0138…",
+    "Connected — 00:02",
+    "Lead marked Qualified",
+    "Follow-up text sent automatically",
+  ];
+  const [lineIdx, setLineIdx] = useState(0);
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    const t1 = setInterval(() => setLineIdx((v) => (v + 1) % LINES.length), 2400);
+    const t2 = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => { clearInterval(t1); clearInterval(t2); };
+  }, []);
+
+  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+
+  return (
+    <div className="rounded-2xl mkt-glass-card !hover:translate-y-0 p-7 relative overflow-hidden">
+      <div
+        className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-mkt-green/[0.12] blur-[80px] pointer-events-none"
+        aria-hidden="true"
+      />
+      <div className="relative flex items-center justify-between mb-8">
+        <span className="flex items-center gap-2 text-xs font-mono text-mkt-green">
+          <span className="w-1.5 h-1.5 rounded-full bg-mkt-green animate-pulse" />
+          LIVE CALL
+        </span>
+        <span className="font-mono text-xs text-white/40">{mm}:{ss}</span>
+      </div>
+      <div className="relative flex items-end gap-[3px] h-20 mb-8">
+        {Array.from({ length: 32 }).map((_, i) => (
+          <span
+            key={i}
+            className="flex-1 bg-mkt-green/60 rounded-full animate-signal-bar"
+            style={{ animationDelay: `${(i % 8) * 0.09}s`, height: "100%" }}
+          />
+        ))}
+      </div>
+      <div className="relative h-6 overflow-hidden">
+        <p key={lineIdx} className="text-sm text-white/80 font-mono animate-word-in">
+          {LINES[lineIdx]}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const STORY_STEPS = [
+  { tag: "New lead comes in?", title: "Called within minutes", copy: "A lead hits your Prospector results. Your team is already calling from the browser dialer — transcript, duration, and outcome logged automatically." },
+  { tag: "Lead gone quiet?", title: "Re-engaged automatically", copy: "Cold leads sitting in the Master pool get resurfaced the next time a teammate searches something similar — no lead ever fully disappears." },
+  { tag: "Wallet running low?", title: "Flagged before it's a problem", copy: "One email the moment balance dips, an in-app banner the whole time after — never a surprise mid-call disconnection." },
+];
+
+const QUOTES = [
+  "Our team stopped losing call notes the day we switched.",
+  "Found us 40 qualified roofing leads in a slow week.",
+  "STOP replies used to be a compliance headache. Now it's automatic.",
+  "Clean, fast, and our reps were productive on day one.",
+  "One number, one CRM, way fewer tabs open.",
+  "The Prospector alone paid for the platform in a week.",
+];
 
 export default function MarketingHome() {
   return (
-    <div className="min-h-screen bg-paper-50">
-      <AnnouncementBanner />
+    <div className="mkt-page min-h-screen">
       <PublicNav />
 
-      {/* Hero — the ledger mockup is a literal picture of the product: real
-          calls and leads, logged in rows, as they happen. The ambient
-          backdrop is the "this is alive" layer: three color fields drift
-          slowly behind the copy, quiet enough to sit behind body text. */}
-      <section className="relative overflow-hidden border-b border-paper-200">
-        <AmbientBackdrop />
-        <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <span className="label-eyebrow inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full border border-paper-300 bg-white/80 backdrop-blur">
-              Phone system · CRM · AI lead generation
-            </span>
-            <h1 className="font-voice text-5xl sm:text-6xl leading-[1.05] tracking-tight mb-6 text-ink-900">
-              Every call is a lead.
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div
+          className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-mkt-green/[0.08] blur-[120px] pointer-events-none"
+          aria-hidden="true"
+        />
+        <div className="relative max-w-3xl mx-auto px-6 pt-28 pb-16 text-center">
+          <Reveal delay={50}>
+            <h1 className="font-display font-extrabold text-5xl sm:text-6xl leading-[1.05] tracking-tight mb-8">
+              <span className="mkt-heading-gradient">The sales CRM built for</span>
               <br />
-              Every lead is <em className="italic text-signal">one number</em> away.
+              <RotatingWord />
             </h1>
-            <p className="text-ink-600 text-lg max-w-lg mb-10 leading-relaxed">
-              cagent gives your team a browser-based phone, a CRM that updates itself from every
-              call and text, and an AI prospector that finds new leads before your team runs out
-              of ones to call.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link to="/contact" className="btn-primary !px-6 !py-3 text-sm">
-                Start free <ArrowRight size={16} />
-              </Link>
-              <Link to="/pricing" className="btn-secondary !px-6 !py-3 text-sm bg-white/80 backdrop-blur">
-                See pricing
-              </Link>
-            </div>
-          </div>
-
-          <div className="relative max-w-md mx-auto lg:mx-0 lg:ml-auto w-full">
-            <LedgerMockup />
-            {/* Floating stat chip — a second, smaller living element: a real
-                number the product would actually surface, not a decoration. */}
-            <div className="hidden sm:flex absolute -bottom-6 -left-8 items-center gap-2.5 bg-white border border-paper-200 rounded-xl shadow-raised-lg px-4 py-3 animate-fade-up">
-              <span className="w-8 h-8 rounded-lg bg-live/10 text-live flex items-center justify-center shrink-0">
-                <TrendingUp size={16} />
-              </span>
-              <div className="leading-tight">
-                <p className="text-sm font-semibold text-ink-900 font-mono">+32%</p>
-                <p className="text-[11px] text-ink-500">leads worked this week</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <TrustStrip />
-
-      {/* Feature trio */}
-      <section className="max-w-6xl mx-auto px-6 py-24">
-        <div className="grid md:grid-cols-3 gap-6">
-          <Reveal delay={0}>
-            <FeatureCard
-              icon={PhoneCall}
-              color="signal"
-              title="Dial from the browser"
-              description="A real phone built into the CRM. Buy a number, assign it to an agent, and calls start routing — no desk phone, no separate app."
-            />
           </Reveal>
           <Reveal delay={100}>
-            <FeatureCard
-              icon={MessageSquareText}
-              color="live"
-              title="Texts that stay compliant"
-              description="Every conversation lives on the lead's timeline. Reply STOP and cagent locks that contact out automatically — no manual tracking required."
-            />
+            <p className="text-mkt-muted text-lg max-w-xl mx-auto mb-9">
+              Cagent puts your phone, your texts, and your AI-found leads in one place —
+              so your team spends the day talking to people, not switching tabs.
+            </p>
           </Reveal>
           <Reveal delay={200}>
-            <FeatureCard
-              icon={Sparkles}
-              color="amber"
-              title="AI finds your next leads"
-              description="Describe who you're looking for. cagent searches, qualifies, and hands your team a list of real contacts to call — no spreadsheets involved."
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-4">
+              <Link to="/contact" className="mkt-btn-primary">Try for free <ArrowRight size={16} /></Link>
+              <Link to="/pricing" className="mkt-btn-secondary">See pricing</Link>
+            </div>
+          </Reveal>
+        </div>
+
+        <Reveal delay={250}>
+          <div className="max-w-4xl mx-auto px-6 pb-28">
+            <LiveDemoPanel />
+          </div>
+        </Reveal>
+      </section>
+
+      {/* Stat trio */}
+      <section className="border-t border-mkt-line">
+        <div className="max-w-4xl mx-auto px-6 py-16 grid sm:grid-cols-3 gap-8 text-center">
+          <Reveal delay={0}><Stat value={<CountUp to={25} />} label="leads filled per search, guaranteed" /></Reveal>
+          <Reveal delay={100}><Stat value={<CountUp to={0.5} decimals={2} prefix="$" />} label="flat cost per Prospector search" /></Reveal>
+          <Reveal delay={200}>
+            <Stat
+              value={<span className="inline-flex items-center gap-1"><CountUp to={4.7} decimals={1} /> <Star size={22} className="fill-mkt-yellow text-mkt-yellow" /></span>}
+              label="the rating we're aiming for"
             />
           </Reveal>
         </div>
       </section>
 
-      {/* How it works — genuinely a sequence, so numbering earns its place */}
-      <section className="border-y border-paper-200 bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-24">
-          <Reveal>
-            <p className="label-eyebrow text-center mb-3">How it works</p>
-            <h2 className="font-display text-3xl font-semibold text-center mb-14 text-ink-900">
-              From search to closed, in one place
-            </h2>
-          </Reveal>
-          <div className="grid sm:grid-cols-3 gap-8">
-            <Reveal delay={0}>
-              <Step number="01" title="Search" description="Tell the Prospector who you're looking for. It finds and qualifies real contacts automatically." />
+      {/* Story steps */}
+      <section className="max-w-5xl mx-auto px-6 py-24 border-t border-mkt-line">
+        <Reveal>
+          <p className="mkt-eyebrow text-center mb-3">Built for conversations</p>
+          <h2 className="font-display font-bold text-3xl sm:text-4xl text-center mb-16 max-w-2xl mx-auto">
+            Calling, texting, and pipeline — all working your leads for you
+          </h2>
+        </Reveal>
+        <div className="space-y-5 sm:space-y-6 md:space-y-7">
+          {STORY_STEPS.map((step, i) => (
+            <Reveal key={step.title} delay={i * 80}>
+              <div className="mkt-glass-card !p-7 sm:!p-8 grid md:grid-cols-[1fr_auto] gap-6 items-center">
+                <div>
+                  <p className="text-mkt-green font-semibold text-sm mb-2">{step.tag}</p>
+                  <h3 className="font-display font-bold text-xl mb-2">{step.title}</h3>
+                  <p className="text-mkt-muted text-sm leading-loose max-w-lg">{step.copy}</p>
+                </div>
+                <CheckCircle2 size={32} className="text-mkt-green/50 shrink-0 hidden md:block" />
+              </div>
             </Reveal>
-            <Reveal delay={100}>
-              <Step number="02" title="Connect" description="Call or text straight from the lead's profile. Every interaction logs itself to their timeline." />
-            </Reveal>
-            <Reveal delay={200}>
-              <Step number="03" title="Close" description="Move leads through your pipeline and watch deal value roll up in real time, per agent and per team." />
-            </Reveal>
-          </div>
+          ))}
         </div>
       </section>
 
-      <Testimonials />
+      {/* Marquee testimonial wall — continuous motion, glass cards */}
+      <section className="py-24 border-t border-mkt-line overflow-hidden">
+        <Reveal>
+          <h2 className="font-display font-bold text-3xl text-center mb-14">Teams can't stop talking about it</h2>
+        </Reveal>
+        <MarqueeRow items={QUOTES} direction="left" />
+        <div className="h-4" />
+        <MarqueeRow items={[...QUOTES].reverse()} direction="right" />
+      </section>
 
-      <Reveal>
-        <section className="relative max-w-4xl mx-auto px-6 py-24 text-center overflow-hidden">
-          <h2 className="font-voice text-4xl sm:text-5xl mb-5 text-ink-900">
-            Give your team a phone that already <em className="italic text-signal">knows</em> the customer.
-          </h2>
-          <p className="text-ink-500 mb-8">No setup fees. No contracts. Cancel any time.</p>
-          <Link to="/contact" className="btn-primary !px-7 !py-3.5 text-sm inline-flex">
-            Start free <ArrowRight size={16} />
-          </Link>
-        </section>
-      </Reveal>
+      {/* Closing CTA */}
+      <section className="relative max-w-3xl mx-auto px-6 py-24 text-center border-t border-mkt-line overflow-hidden">
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] rounded-full bg-mkt-green/[0.08] blur-[100px] pointer-events-none"
+          aria-hidden="true"
+        />
+        <Reveal>
+          <h2 className="font-display font-bold text-4xl mb-5">Stop missing leads.</h2>
+          <p className="text-mkt-muted mb-8">Set up your first number in minutes.</p>
+          <Link to="/contact" className="mkt-btn-primary inline-flex">Try for free <ArrowRight size={16} /></Link>
+        </Reveal>
+      </section>
 
       <PublicFooter />
     </div>
   );
 }
 
-function FeatureCard({ icon: Icon, color, title, description }) {
-  const colorClasses = {
-    signal: "bg-signal/8 border-signal/25 text-signal",
-    live: "bg-live/8 border-live/25 text-live",
-    amber: "bg-amber/8 border-amber/25 text-amber-dim",
-  }[color];
-
+function Stat({ value, label }) {
   return (
-    <div className="card p-7 hover:shadow-raised-lg hover:-translate-y-0.5 transition duration-300">
-      <div className={`inline-flex p-3 rounded-xl border mb-5 ${colorClasses}`}>
-        <Icon size={20} />
-      </div>
-      <h3 className="font-display text-lg font-semibold mb-2 text-ink-900">{title}</h3>
-      <p className="text-sm text-ink-600 leading-relaxed">{description}</p>
+    <div>
+      <p className="font-display font-extrabold text-4xl mb-2">{value}</p>
+      <p className="text-sm text-mkt-muted">{label}</p>
     </div>
   );
 }
 
-function Step({ number, title, description }) {
+function MarqueeRow({ items, direction }) {
+  const loop = [...items, ...items];
   return (
-    <div>
-      <p className="font-mono text-sm text-signal mb-3">{number}</p>
-      <h3 className="font-display text-lg font-semibold mb-2 text-ink-900">{title}</h3>
-      <p className="text-sm text-ink-600 leading-relaxed">{description}</p>
+    <div className="relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
+      <div
+        className="flex w-max gap-4 animate-marquee"
+        style={{ animationDirection: direction === "right" ? "reverse" : "normal", animationDuration: "34s" }}
+      >
+        {loop.map((q, i) => (
+          <div key={i} className="mkt-glass-card !p-5 w-[320px] shrink-0 text-sm text-white/70 leading-relaxed">
+            "{q}"
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

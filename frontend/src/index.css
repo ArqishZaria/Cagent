@@ -1,99 +1,141 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  html {
-    color-scheme: light;
-  }
-  body {
-    @apply bg-paper-50 text-ink-800 font-body antialiased;
-    /* A faint ruled-ledger texture on the page background — quiet nod to
-       the product's real subject (calls and money, logged in rows). Never
-       visible once a white card sits on top of it. */
-    background-image: linear-gradient(rgba(28, 26, 22, 0.035) 1px, transparent 1px);
-    background-size: 100% 34px;
-  }
-  h1, h2, h3, h4 {
-    @apply font-display text-ink-900;
-  }
-  :focus-visible {
-    @apply outline-none shadow-focus rounded-md;
-  }
+  html { color-scheme: light; }
+  body { @apply bg-paper-50 text-ink-700 font-body antialiased; }
+  h1, h2, h3, h4 { @apply font-display; }
+  :focus-visible { @apply outline-none shadow-focus rounded-lg; }
 }
+@layer base {
+  /* App dashboard headings stay dark navy */
+  .card h1, .card h2, .card h3, .card h4,
+  main h1, main h2, main h3, main h4 { @apply text-ink-900; }
 
+  /* Marketing headings are always white, full stop */
+  .mkt-page h1, .mkt-page h2, .mkt-page h3, .mkt-page h4 { @apply text-white; }
+}
 @layer components {
-  /* Surfaces ------------------------------------------------------------ */
-  .card {
-    @apply bg-white border border-paper-200 rounded-xl shadow-card;
-  }
-  .card-raised {
-    @apply bg-white border border-paper-200 rounded-xl shadow-raised-lg;
-  }
-  .card-flat {
-    @apply bg-white border-y border-paper-200;
-  }
+  /* =========================================================
+     APP DASHBOARD (post-login) — light, Stripe/Apollo language
+     ========================================================= */
+  .card        { @apply bg-white border border-paper-200 rounded-xl shadow-card; }
+  .card-raised { @apply bg-white border border-paper-200 rounded-xl shadow-raised-lg; }
+  .card-flat   { @apply bg-white border-y border-paper-200; }
 
-  /* Buttons --------------------------------------------------------------
-     One filled accent per view is the rule: .btn-primary (forest) is the
-     default call to action; .btn-amber is reserved for money-moving actions
-     (buying a number, upgrading a plan); everything else is quieter. */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
            font-body font-medium text-sm text-white
-           bg-signal border border-signal-dim/30
-           hover:bg-signal-dim active:scale-[0.99]
+           bg-signal hover:bg-signal-dim active:scale-[0.99]
            transition disabled:opacity-40 disabled:pointer-events-none;
   }
   .btn-amber {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
            font-body font-medium text-sm text-white
-           bg-amber border border-amber-dim/30
-           hover:bg-amber-dim active:scale-[0.99]
+           bg-amber hover:bg-amber-dim active:scale-[0.99]
            transition disabled:opacity-40 disabled:pointer-events-none;
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
-           font-body font-medium text-sm text-ink-800
+           font-body font-medium text-sm text-ink-700
            bg-white border border-paper-300
-           hover:bg-paper-100 hover:border-ink-300
+           hover:bg-paper-50 hover:border-ink-300
            transition disabled:opacity-40 disabled:pointer-events-none;
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
-           font-body font-medium text-sm text-ink-600
+           font-body font-medium text-sm text-ink-500
            hover:bg-paper-100 hover:text-ink-900
            transition disabled:opacity-40 disabled:pointer-events-none;
   }
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
            font-body font-medium text-sm text-white
-           bg-alert border border-alert-dim/30
-           hover:bg-alert-dim active:scale-[0.99]
+           bg-alert hover:bg-alert-dim active:scale-[0.99]
            transition disabled:opacity-40 disabled:pointer-events-none;
   }
 
-  /* Forms ----------------------------------------------------------------*/
   .input-field {
     @apply w-full rounded-lg bg-white border border-paper-300 px-3.5 py-2.5
            text-sm text-ink-900 placeholder:text-ink-400
            focus:border-signal focus:shadow-focus transition;
   }
-  .label-eyebrow {
-    @apply text-[11px] font-mono uppercase tracking-[0.14em] text-ink-500;
-  }
+  .label-eyebrow { @apply text-[11px] font-mono uppercase tracking-[0.1em] text-ink-500; }
 
-  /* Ledger — the signature motif: ruled rows with tabular figures, used for
-     activity feeds, invoices, and call/lead lists. */
   .ledger-row {
     @apply flex items-center justify-between gap-3 py-3 px-0
            border-b border-paper-200 last:border-b-0
            font-mono text-[13px] tabular-nums text-ink-700;
   }
+  .glass-panel { @apply bg-white/85 backdrop-blur-md border border-paper-200; }
 
-  .glass-panel {
-    @apply bg-white/85 backdrop-blur-md border border-paper-200;
+  /* =========================================================
+     MARKETING (logged out) — black throughout, close.com-style
+     ========================================================= */
+  .mkt-page { @apply bg-mkt-ink text-white; }
+  .mkt-eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-mkt-green; }
+
+  .mkt-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5
+           font-body font-semibold text-sm text-mkt-ink bg-mkt-green
+           hover:brightness-95 hover:scale-[1.02] active:scale-[0.98] transition duration-200;
+  }
+  .mkt-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5
+           font-body font-semibold text-sm border border-white/20 text-white
+           hover:border-mkt-green hover:text-mkt-green transition duration-200;
+  }
+  .mkt-card {
+    @apply rounded-2xl border border-mkt-line bg-mkt-panel p-6
+           transition duration-300 hover:border-mkt-green/40 hover:-translate-y-1 hover:bg-mkt-panelHover;
+  }
+  .mkt-nav-link {
+    @apply text-sm text-mkt-muted hover:text-white transition duration-150 relative;
+  }
+  .mkt-link {
+    @apply text-mkt-green hover:text-white transition duration-150 underline-offset-4 hover:underline;
+  }
+  .mkt-input {
+    @apply w-full rounded-lg bg-mkt-ink border border-mkt-line px-3.5 py-2.5
+           text-sm text-white placeholder:text-white/30
+           focus:border-mkt-green focus:shadow-[0_0_0_3px_rgba(0,217,100,0.15)] transition;
+  }
+  .mkt-avatar {
+    @apply w-11 h-11 rounded-full object-cover border-2 border-mkt-line;
+  }
+
+  /* Stock photos get a grayscale + brand-green duotone wash so they read as
+     "part of the black site" instead of stock-photo-pasted-on-top. */
+  .mkt-photo-wrap {
+    @apply relative overflow-hidden rounded-2xl border border-mkt-line;
+  }
+  .mkt-photo-wrap img {
+    @apply w-full h-full object-cover grayscale contrast-125 brightness-75;
+  }
+  .mkt-photo-wrap::after {
+    content: "";
+    @apply absolute inset-0 pointer-events-none;
+    background: linear-gradient(160deg, rgba(0,217,100,0.28), rgba(10,10,11,0.55) 70%);
+    mix-blend-mode: multiply;
+  }
+    /* Frosted glass — nav, floating cards, modals over the black canvas */
+  .mkt-glass {
+    @apply bg-white/[0.04] backdrop-blur-xl border border-white/10;
+  }
+  .mkt-glass-card {
+    @apply rounded-2xl bg-white/[0.05] backdrop-blur-xl border border-white/10
+           shadow-[0_8px_32px_rgba(0,0,0,0.4)]
+           transition duration-300 hover:bg-white/[0.08] hover:border-mkt-green/30 hover:-translate-y-1;
+  }
+  .mkt-glass-pill {
+    @apply bg-white/[0.06] backdrop-blur-md border border-white/10 rounded-full;
+  }
+  /* Gradient headline text — use on the static (non-rotating) part of h1s */
+  .mkt-heading-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(180deg, #FFFFFF 0%, #B8BCC4 100%);
   }
 }
