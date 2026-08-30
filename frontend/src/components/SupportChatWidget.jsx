@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, Paperclip, Send, X } from "lucide-react";
+import { AlertTriangle, MessageCircle, Paperclip, RefreshCw, Send, X } from "lucide-react";
 import api from "../lib/api";
+import { formatMessageTime } from "../lib/formatTime";
 
 /**
  * SupportChatWidget
@@ -17,6 +18,9 @@ import api from "../lib/api";
  * (attachment_url) that a plain <img> can't load (no way to attach an
  * Authorization header to an <img> tag), so each real attachment is
  * fetched once via an authenticated blob request and cached locally.
+ * A failed fetch now surfaces a retryable "couldn't load" chip (and logs
+ * to console) instead of silently vanishing, so real failures are visible
+ * and debuggable rather than looking like "attachments just don't work."
  */
 export default function SupportChatWidget({ mode = "floating" }) {
   const [open, setOpen] = useState(mode === "embedded");
@@ -25,8 +29,10 @@ export default function SupportChatWidget({ mode = "floating" }) {
   const [pendingFile, setPendingFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [attachmentBlobs, setAttachmentBlobs] = useState({});
+  const [attachmentErrors, setAttachmentErrors] = useState({});
   const scrollRef = useRef(null);
   const fileInputRef = useRef(null);
+  const createdBlobUrlsRef = useRef(new Set());
 
   useEffect(() => {
     if (!open) return;
@@ -50,22 +56,46 @@ export default function SupportChatWidget({ mode = "floating" }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  // Revoke every blob URL we created once the widget unmounts, so long
+  // sessions with lots of attachments don't leak memory.
+  useEffect(() => {
+    return () => {
+      createdBlobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  const fetchAttachment = (messageId, url) => {
+    setAttachmentErrors((prev) => {
+      const next = { ...prev };
+      delete next[messageId];
+      return next;
+    });
+    api
+      .get(url, { responseType: "blob" })
+      .then((res) => {
+        const blobUrl = URL.createObjectURL(res.data);
+        createdBlobUrlsRef.current.add(blobUrl);
+        setAttachmentBlobs((prev) => ({ ...prev, [messageId]: blobUrl }));
+      })
+      .catch((err) => {
+        // Surfaced instead of swallowed — check this in devtools if
+        // attachments still don't load: 401/403 means an auth/tenant
+        // mismatch, 404 means the file isn't on disk, a network-level
+        // failure with no status usually means CORS or the API being
+        // unreachable.
+        console.error("Support attachment failed to load:", url, err?.response?.status, err);
+        setAttachmentErrors((prev) => ({ ...prev, [messageId]: true }));
+      });
+  };
+
   // Fetch each real (server-side) attachment exactly once as an
   // authenticated blob, since attachment_url requires a Bearer token an
   // <img src> can't send on its own.
   useEffect(() => {
     messages.forEach((m) => {
       const isLocal = String(m.id).startsWith("local-");
-      if (m.attachment_url && !isLocal && !attachmentBlobs[m.id]) {
-        api
-          .get(m.attachment_url, { responseType: "blob" })
-          .then((res) => {
-            const url = URL.createObjectURL(res.data);
-            setAttachmentBlobs((prev) => ({ ...prev, [m.id]: url }));
-          })
-          .catch(() => {
-            /* attachment fetch failure shouldn't block the rest of the thread */
-          });
+      if (m.attachment_url && !isLocal && !attachmentBlobs[m.id] && !attachmentErrors[m.id]) {
+        fetchAttachment(m.id, m.attachment_url);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,6 +179,7 @@ export default function SupportChatWidget({ mode = "floating" }) {
         {messages.map((m) => {
           const isLocal = String(m.id).startsWith("local-");
           const imgSrc = isLocal ? m.attachment_url : attachmentBlobs[m.id];
+          const failed = !isLocal && attachmentErrors[m.id];
           return (
             <div
               key={m.id}
@@ -166,6 +197,24 @@ export default function SupportChatWidget({ mode = "floating" }) {
                   className="rounded-lg max-w-full mt-2 max-h-48 object-cover"
                 />
               )}
+              {failed && (
+                <button
+                  onClick={() => fetchAttachment(m.id, m.attachment_url)}
+                  className={`flex items-center gap-1.5 mt-2 text-xs underline ${
+                    m.is_from_platform_owner ? "text-ink-500" : "text-white/80"
+                  }`}
+                >
+                  <AlertTriangle size={12} /> Couldn't load attachment
+                  <RefreshCw size={11} className="ml-1" /> Retry
+                </button>
+              )}
+              <span
+                className={`block text-right text-[10px] mt-1 ${
+                  m.is_from_platform_owner ? "text-ink-400" : "text-white/70"
+                }`}
+              >
+                {formatMessageTime(m.timestamp)}
+              </span>
             </div>
           );
         })}

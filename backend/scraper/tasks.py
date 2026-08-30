@@ -101,13 +101,6 @@ def run_lead_scrape(self, scrape_task_id):
         scrape_task.save(update_fields=[
             "status", "existing_count", "master_pulled_count", "freshly_scraped_count",
         ])
-        scrape_task.status = ScrapeTask.Status.COMPLETED
-        scrape_task.existing_count = existing_count
-        scrape_task.master_pulled_count = len(master_pulled)
-        scrape_task.freshly_scraped_count = created
-        scrape_task.save(update_fields=[
-            "status", "existing_count", "master_pulled_count", "freshly_scraped_count",
-        ])
 
         total_returned = existing_count + len(master_pulled) + created
         bill_lead_search(tenant, scrape_task, total_returned)

@@ -3,6 +3,7 @@ import {
   Building2, CheckCircle2, Loader2, Mail, PlusCircle, Search, Users,
 } from "lucide-react";
 import api from "../lib/api";
+import PasswordInput from "../components/PasswordInput";
 
 /**
  * CompanySettingsPage — the boss-only control room.
@@ -217,9 +218,9 @@ function TeamCard() {
         <input className="input-field" type="email" placeholder="Email" required value={form.email} onChange={update("email")} />
         <input className="input-field" placeholder="First name" value={form.first_name} onChange={update("first_name")} />
         <input className="input-field" placeholder="Last name" value={form.last_name} onChange={update("last_name")} />
-        <input
-          className="input-field sm:col-span-2"
-          type="password"
+        <PasswordInput
+          className="input-field"
+          wrapperClassName="sm:col-span-2"
           placeholder="Password"
           required
           value={form.password}

@@ -1,11 +1,36 @@
-import { useEffect, useRef, useState } from "react";
+// frontend/src/pages/CrmDialerView.jsx
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { PhoneCall, Search, X } from "lucide-react";
 import api from "../lib/api";
 import LeadChatPanel from "../components/LeadChatPanel";
 import LeadListItem from "../components/LeadListItem";
 
-const POLL_INTERVAL_MS = 6000;
+const POLL_INTERVAL_MS = 4000; // was 6000 — snappier while we don't have push yet
+
+// --- unread read-state (per-device, localStorage-backed) ---------------------------
+// Compares each lead's last_message_at (already returned by the API) against
+// the last time THIS BROWSER had that chat open. No push channel yet, so this
+// can't sync across teammates/devices — it's a stopgap, not a corner cut: it
+// only ever compares timestamps (never counts), so there's no double-count
+// risk from refetch races the way a naive unread-counter would have.
+const READ_STATE_KEY = "cagent:chatLastRead";
+
+function loadReadState() {
+  try {
+    return JSON.parse(localStorage.getItem(READ_STATE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveReadState(state) {
+  try {
+    localStorage.setItem(READ_STATE_KEY, JSON.stringify(state));
+  } catch {
+    /* storage full/unavailable — unread badges just won't persist, non-fatal */
+  }
+}
 
 export default function CrmDialerPage() {
   const [leads, setLeads] = useState([]);
@@ -14,6 +39,7 @@ export default function CrmDialerPage() {
   const [fromNumber, setFromNumber] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [readTick, setReadTick] = useState(0); // bumped to force unread-map recompute after a write
   const location = useLocation();
   const pollRef = useRef(null);
 
@@ -60,6 +86,34 @@ export default function CrmDialerPage() {
   }, [location.state]);
 
   const activeLead = leads.find((l) => l.id === activeLeadId) || null;
+
+  // Whenever the active lead (or its last_message_at) changes, treat it as
+  // read right now — covers both "just opened this chat" and "poll brought
+  // in a newer message while this chat is already open on screen."
+  useEffect(() => {
+    if (!activeLead) return;
+    const state = loadReadState();
+    const stamp = activeLead.last_message_at || new Date().toISOString();
+    if (state[activeLead.id] !== stamp) {
+      state[activeLead.id] = stamp;
+      saveReadState(state);
+      setReadTick((t) => t + 1);
+    }
+  }, [activeLead?.id, activeLead?.last_message_at]);
+
+  const unreadLeadIds = useMemo(() => {
+    const state = loadReadState();
+    const unread = new Set();
+    leads.forEach((l) => {
+      if (!l.last_message_at) return;
+      const readAt = state[l.id];
+      if (!readAt || new Date(l.last_message_at) > new Date(readAt)) {
+        unread.add(l.id);
+      }
+    });
+    return unread;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, readTick]);
 
   const query = search.trim().toLowerCase();
   const visibleLeads = query
@@ -124,6 +178,7 @@ export default function CrmDialerPage() {
               lead={lead}
               compact
               active={lead.id === activeLeadId}
+              unread={unreadLeadIds.has(lead.id)}
               onSelect={() => setActiveLeadId(lead.id)}
             />
           ))}

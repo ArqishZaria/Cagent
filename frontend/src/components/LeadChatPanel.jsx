@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Ban, DollarSign, Phone, PhoneOff, Send } from "lucide-react";
 import api from "../lib/api";
 import useTelnyxCall from "../hooks/useTelnyxCall";
+import { formatMessageTime } from "../lib/formatTime";
 
 const STATUS_COLORS = {
   NEW: "bg-ink-100 text-ink-700 border-ink-200",
@@ -13,6 +14,7 @@ const STATUS_COLORS = {
 };
 
 const SCROLL_LOAD_THRESHOLD = 80; // px from top that triggers loading older messages
+const MESSAGE_POLL_INTERVAL_MS = 3000; // was 5000 — snappier while we don't have push yet
 
 /**
  * LeadChatPanel — left side of the CRM/Dialer view: lead profile up top,
@@ -78,7 +80,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
       } catch {
         /* transient — try again next tick */
       }
-    }, 5000);
+    }, MESSAGE_POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [lead?.id]);
 
@@ -230,7 +232,14 @@ export default function LeadChatPanel({ lead, fromNumber }) {
               m.direction === "OUTBOUND" ? "bg-signal text-white ml-auto" : "bg-white border border-paper-200 text-ink-800 mr-auto"
             }`}
           >
-            {m.message_body}
+            <p>{m.message_body}</p>
+            <span
+              className={`block text-right text-[10px] mt-1 ${
+                m.direction === "OUTBOUND" ? "text-white/70" : "text-ink-400"
+              }`}
+            >
+              {formatMessageTime(m.timestamp)}
+            </span>
           </div>
         ))}
       </div>

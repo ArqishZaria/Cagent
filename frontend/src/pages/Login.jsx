@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
 import api from "../lib/api";
+import PasswordInput from "../components/PasswordInput";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -49,8 +50,13 @@ export default function LoginPage() {
             <label className="mkt-eyebrow">Password</label>
             <Link to="/forgot-password" className="mkt-link text-xs">Forgot password?</Link>
           </div>
-          <input className="mkt-input mb-5" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          
+          <PasswordInput
+            className="mkt-input"
+            wrapperClassName="mb-5"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
           {error && <p className="text-xs text-red-400 mb-4">{error}</p>}
 
           <button type="submit" disabled={loading} className="mkt-btn-primary w-full justify-center">

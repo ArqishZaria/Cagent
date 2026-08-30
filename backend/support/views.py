@@ -1,3 +1,5 @@
+import mimetypes
+
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -66,6 +68,11 @@ class SupportAttachmentDownloadView(APIView):
     GET /api/support/<id>/attachment/ — streams the uploaded proof file.
     Tenant-scoped: only an ADMIN belonging to the same tenant as the
     message can fetch it, matching the boss-only nature of this chat.
+
+    Content-Type is now explicitly guessed from the filename rather than
+    left to FileResponse's own detection — belt-and-suspenders so an image
+    always comes back with an image/* content type an <img> tag can render
+    from a blob URL, regardless of how the file was originally stored.
     """
 
     permission_classes = [IsAuthenticated, IsTenantAdmin]
@@ -75,4 +82,10 @@ class SupportAttachmentDownloadView(APIView):
         if not msg.attachment:
             raise Http404("No attachment on this message.")
         filename = msg.attachment.name.split("/")[-1]
-        return FileResponse(msg.attachment.open("rb"), as_attachment=False, filename=filename)
+        content_type, _ = mimetypes.guess_type(filename)
+        return FileResponse(
+            msg.attachment.open("rb"),
+            as_attachment=False,
+            filename=filename,
+            content_type=content_type or "application/octet-stream",
+        )

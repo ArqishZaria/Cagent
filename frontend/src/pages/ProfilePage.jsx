@@ -6,6 +6,8 @@ import {
 import api from "../lib/api";
 import { useCurrentUser } from "../lib/currentUser";
 import { logout } from "../lib/auth";
+import PasswordInput from "../components/PasswordInput";
+
 const SUB_STATUS_COLORS = {
   ACTIVE: "bg-live/10 text-live border-live/25",
   PAID_OVERDUE: "bg-alert/10 text-alert border-alert/25",
@@ -174,12 +176,27 @@ function ChangePasswordCard() {
         </div>
       </div>
       <form onSubmit={submit} className="space-y-3">
-        <input className="input-field" type="password" placeholder="Current password" required
-          value={form.old_password} onChange={update("old_password")} />
-        <input className="input-field" type="password" placeholder="New password" required
-          value={form.new_password} onChange={update("new_password")} />
-        <input className="input-field" type="password" placeholder="Confirm new password" required
-          value={form.confirm} onChange={update("confirm")} />
+        <PasswordInput
+          className="input-field"
+          placeholder="Current password"
+          required
+          value={form.old_password}
+          onChange={update("old_password")}
+        />
+        <PasswordInput
+          className="input-field"
+          placeholder="New password"
+          required
+          value={form.new_password}
+          onChange={update("new_password")}
+        />
+        <PasswordInput
+          className="input-field"
+          placeholder="Confirm new password"
+          required
+          value={form.confirm}
+          onChange={update("confirm")}
+        />
         <p className="text-[11px] text-ink-400">
           Must be at least 8 characters, not too common, and not entirely numbers.
         </p>

@@ -1,3 +1,4 @@
+// frontend/src/components/LeadListItem.jsx
 import { Building2, DollarSign, Mail, MapPin, MessageSquareText, Phone } from "lucide-react";
 
 const STATUS_COLORS = {
@@ -17,12 +18,15 @@ const STATUS_COLORS = {
  * + status only). Full mode (default) shows the complete card — company,
  * address/city/state, phone, email — with a "Contact" button.
  *
+ * `unread`: compact mode only — bolds the name and shows a small dot when
+ * this lead has messages the person hasn't opened yet on this device.
+ *
  * `onSelect`: used by the CRM sidebar — clicking the row selects it as the
  * active lead without navigating anywhere.
  * `onContact`: used by Prospector/bulk-upload results — a dedicated button
  * that jumps to this lead's SMS thread in the CRM.
  */
-export default function LeadListItem({ lead, compact = false, active = false, onSelect, onContact }) {
+export default function LeadListItem({ lead, compact = false, active = false, unread = false, onSelect, onContact }) {
   const name = `${lead.first_name || ""} ${lead.last_name || ""}`.trim() || lead.company || "Unnamed lead";
   const location = [lead.city, lead.state].filter(Boolean).join(", ");
 
@@ -34,7 +38,12 @@ export default function LeadListItem({ lead, compact = false, active = false, on
           active ? "bg-signal/8 border border-signal/30" : "hover:bg-paper-100 border border-transparent"
         }`}
       >
-        <p className="text-sm font-medium text-ink-900 truncate">{name}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className={`text-sm truncate ${unread ? "font-semibold text-ink-900" : "font-medium text-ink-900"}`}>
+            {name}
+          </p>
+          {unread && <span className="w-2 h-2 rounded-full bg-signal shrink-0" aria-label="Unread" />}
+        </div>
         <p className="text-[11px] text-ink-500 truncate">{lead.company}</p>
         <div className="flex items-center justify-between mt-1.5">
           <span className={`text-[10px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded border ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
