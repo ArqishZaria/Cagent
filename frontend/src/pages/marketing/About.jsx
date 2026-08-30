@@ -3,14 +3,14 @@ import { ArrowRight, Phone, Sparkles, Users } from "lucide-react";
 import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
 import Reveal from "../../components/marketing/Reveal";
-import DuotonePhoto from "../../components/marketing/DuotonePhoto";
+import TeamActivityPanel from "../../components/marketing/TeamActivityPanel";
 
 export default function AboutPage() {
   return (
     <div className="mkt-page min-h-screen">
       <PublicNav />
 
-      <section className="max-w-5xl mx-auto px-6 pt-24 pb-16 grid md:grid-cols-2 gap-12 items-center">
+      <section className="max-w-5xl mx-auto px-6 pt-24 pb-20 grid md:grid-cols-2 gap-16 items-center">
         <Reveal>
           <span className="mkt-eyebrow inline-block mb-5">About cagent</span>
           <h1 className="font-display font-extrabold text-4xl sm:text-5xl mb-6 leading-[1.08]">
@@ -25,7 +25,7 @@ export default function AboutPage() {
           </p>
         </Reveal>
         <Reveal delay={150}>
-          <DuotonePhoto seed="cagent-team" w={800} h={900} alt="Sales team on calls" />
+          <TeamActivityPanel />
         </Reveal>
       </section>
 
