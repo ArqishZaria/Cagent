@@ -204,7 +204,12 @@ def bill_sms(interaction):
         return
 
     segments = count_sms_segments(interaction.message_body)
-    per_segment = PricingRate.get_cost(PricingRate.Key.SMS_PER_SEGMENT)
+    rate_key = (
+        PricingRate.Key.SMS_INBOUND_PER_SEGMENT
+        if interaction.direction == interaction.Direction.INBOUND
+        else PricingRate.Key.SMS_OUTBOUND_PER_SEGMENT
+    )
+    per_segment = PricingRate.get_cost(rate_key)
     cost = (per_segment * segments).quantize(Decimal("0.0001"))
 
     bill_usage(
@@ -217,12 +222,23 @@ def bill_sms(interaction):
     )
 
 
-def bill_lead_search(tenant, scrape_task):
+def bill_lead_search(tenant, scrape_task, total_leads_returned: int):
+    """
+    Flat $2.50 charged ONCE the search actually completes and returns at
+    least one lead (existing-in-tenant matches + master-pool pulls +
+    freshly-scraped, combined). A zero-result search costs nothing.
+    Idempotent via related_scrape_task, same pattern as bill_call.
+    """
+    if total_leads_returned <= 0:
+        return
+    if WalletTransaction.objects.filter(related_scrape_task=scrape_task).exists():
+        return
+
     cost = PricingRate.get_cost(PricingRate.Key.LEAD_SEARCH_PER_QUERY)
     bill_usage(
         tenant,
         type=WalletTransaction.Type.USAGE_LEAD_SEARCH,
         cost_usd=cost,
-        description=f"Prospector search: \"{scrape_task.query}\"",
+        description=f'Prospector search: "{scrape_task.query}" — {total_leads_returned} leads',
         related_scrape_task=scrape_task,
     )

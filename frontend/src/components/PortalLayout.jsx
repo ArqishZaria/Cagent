@@ -41,7 +41,7 @@ function SideNav() {
     <nav className="w-60 shrink-0 border-r border-paper-200 bg-white hidden md:flex flex-col py-5">
       <div className="flex items-center gap-2 px-5 mb-6">
         <span className="w-2.5 h-2.5 rounded-full bg-signal" />
-        <span className="font-display font-bold text-base text-ink-900">cagent</span>
+        <span className="font-display font-bold text-base text-ink-900">Cagent</span>
       </div>
 
       <div className="flex-1 px-3 space-y-0.5">
@@ -65,7 +65,7 @@ function SideNav() {
       </div>
 
       <div className="px-5 pt-4 border-t border-paper-200">
-        <p className="text-[11px] text-ink-400 font-mono">v1.0 · cagent</p>
+        <p className="text-[11px] text-ink-400 font-mono">v1.01.01 · Cagent</p>
       </div>
     </nav>
   );

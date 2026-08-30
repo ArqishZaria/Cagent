@@ -43,13 +43,14 @@ class PricingRate(models.Model):
     class Key(models.TextChoices):
         CALL_OUTBOUND_PER_MINUTE = "call_outbound_per_minute", "Outbound call — per minute"
         CALL_INBOUND_PER_MINUTE = "call_inbound_per_minute", "Inbound call — per minute"
-        SMS_PER_SEGMENT = "sms_per_segment", "SMS — per segment"
+        SMS_PER_SEGMENT = "sms_per_segment", "SMS — per segment (legacy, unused)"
+        SMS_OUTBOUND_PER_SEGMENT = "sms_outbound_per_segment", "Outbound SMS — per segment"
+        SMS_INBOUND_PER_SEGMENT = "sms_inbound_per_segment", "Inbound SMS — per segment"
         NUMBER_MONTHLY_RENTAL = "number_monthly_rental", "Phone number — monthly rental"
         NUMBER_SMS_CAPABILITY_FEE = "number_sms_capability_fee", "Phone number — SMS capability add-on (monthly)"
-        TEN_DLC_CAMPAIGN_FEE = "ten_dlc_campaign_fee", "10DLC campaign fee (monthly)"
-        LEAD_SEARCH_PER_QUERY = "lead_search_per_query", "Prospector web search — per query"
+        LEAD_SEARCH_PER_QUERY = "lead_search_per_query", "Prospector web search — per search (flat, up to 25 leads)"
         LEAD_VERIFICATION_PER_ROW = "lead_verification_per_row", "Bulk upload — per-row verification"
-
+        
     key = models.CharField(max_length=64, choices=Key.choices, unique=True)
     cost_usd = models.DecimalField(max_digits=8, decimal_places=4)
     unit = models.CharField(max_length=32, default="per minute")

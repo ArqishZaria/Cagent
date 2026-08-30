@@ -271,8 +271,7 @@ class SMSSendView(APIView):
         sender_number = get_object_or_404(
             PhoneNumber, phone_number=from_number, tenant=request.user.tenant, is_active=True
         )
-
-        estimated_cost = PricingRate.get_cost(PricingRate.Key.SMS_PER_SEGMENT) * count_sms_segments(message)
+        estimated_cost = PricingRate.get_cost(PricingRate.Key.SMS_OUTBOUND_PER_SEGMENT) * count_sms_segments(message)
         try:
             require_balance(request.user.tenant, estimated_cost)
         except InsufficientBalance as exc:

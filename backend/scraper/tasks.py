@@ -6,6 +6,7 @@ from celery import shared_task
 from core.lead_dedup import find_or_create_lead
 from core.master_lead import count_existing_tenant_matches, pull_from_master, upsert_master_lead
 from core.models import Lead, LeadUploadTask, ScrapeTask
+from wallet.services import bill_lead_search
 from scraper.services import (
     SEARCH_RESULT_LIMIT,
     crawl_urls,
@@ -100,6 +101,17 @@ def run_lead_scrape(self, scrape_task_id):
         scrape_task.save(update_fields=[
             "status", "existing_count", "master_pulled_count", "freshly_scraped_count",
         ])
+        scrape_task.status = ScrapeTask.Status.COMPLETED
+        scrape_task.existing_count = existing_count
+        scrape_task.master_pulled_count = len(master_pulled)
+        scrape_task.freshly_scraped_count = created
+        scrape_task.save(update_fields=[
+            "status", "existing_count", "master_pulled_count", "freshly_scraped_count",
+        ])
+
+        total_returned = existing_count + len(master_pulled) + created
+        bill_lead_search(tenant, scrape_task, total_returned)
+
         logger.info(
             "ScrapeTask %s completed: %d existing, %d from master, %d freshly scraped (quota %d)",
             scrape_task_id, existing_count, len(master_pulled), created, LEAD_QUOTA,

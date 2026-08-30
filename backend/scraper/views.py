@@ -17,7 +17,7 @@ from core.permissions import IsTenantMember
 from crm.serializers import LeadSerializer
 from scraper.tasks import process_lead_upload, run_lead_scrape
 from wallet.models import PricingRate
-from wallet.services import InsufficientBalance, bill_lead_search, require_balance
+from wallet.services import InsufficientBalance, require_balance
 
 ALLOWED_UPLOAD_EXTENSIONS = (".csv", ".xlsx", ".xls")
 
@@ -83,7 +83,8 @@ class ScrapeSearchView(APIView):
             query=query,
             status=ScrapeTask.Status.PENDING,
         )
-        bill_lead_search(request.user.tenant, scrape_task)
+        # NOTE: no bill_lead_search() call here anymore — the task bills
+        # after it knows whether any leads actually came back.
         run_lead_scrape.delay(scrape_task.id)
 
         return Response(
