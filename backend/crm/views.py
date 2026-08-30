@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-
+from core.phone_utils import normalize_to_e164
 from core.models import Interaction, Lead
 from core.viewsets import TenantModelViewSet
 from crm.serializers import InteractionSerializer, LeadSerializer
@@ -45,7 +45,7 @@ class LeadViewSet(TenantModelViewSet):
     def perform_create(self, serializer):
         tenant = self.request.user.tenant
         email = (serializer.validated_data.get("email") or "").strip()
-        phone = (serializer.validated_data.get("phone_number") or "").strip()
+        phone = normalize_to_e164((serializer.validated_data.get("phone_number") or "").strip())
         if email and Lead.objects.filter(tenant=tenant, email__iexact=email).exists():
             raise ValidationError({"email": "A lead with this email already exists."})
         if phone and Lead.objects.filter(tenant=tenant, phone_number=phone).exists():

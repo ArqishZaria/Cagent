@@ -8,7 +8,7 @@ existing lead in the same tenant means it's the same lead, not a new one.
 """
 
 from core.models import Lead
-
+from core.phone_utils import normalize_to_e164
 
 def find_or_create_lead(tenant, email="", phone="", defaults=None, owner=None, scrape_task=None):
     """
@@ -27,7 +27,7 @@ def find_or_create_lead(tenant, email="", phone="", defaults=None, owner=None, s
     """
     defaults = defaults or {}
     email = (email or "").strip()
-    phone = (phone or "").strip()
+    phone = normalize_to_e164((phone or "").strip())
 
     lead = None
     if email:

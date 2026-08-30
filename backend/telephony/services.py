@@ -12,30 +12,12 @@ import requests
 import telnyx
 from django.conf import settings
 from django.core.cache import cache
-import re
-
-TELNYX_API_BASE = "https://api.telnyx.com/v2"
-
 import logging
+from core.phone_utils import normalize_to_e164 
+TELNYX_API_BASE = "https://api.telnyx.com/v2"
 
 logger = logging.getLogger(__name__)
 
-
-
-def normalize_to_e164(phone_number: str, default_country_code: str = "1") -> str:
-    """
-    Normalizes a US-style phone number into E.164 format for Telnyx's API.
-    Strips all non-digit characters, then prefixes '+1' (or the given
-    default country code) if not already present. This handles the common
-    case of leads stored as '(512) 478-2500' or '512-478-2500' from manual
-    entry, bulk upload, or scraped data that wasn't already normalized.
-    """
-    digits = re.sub(r"\D", "", phone_number or "")
-    if not digits:
-        return phone_number  # nothing we can do — let Telnyx reject it with a clear error
-    if len(digits) == 10:
-        digits = default_country_code + digits
-    return f"+{digits}"
 
 class TelnyxAPIError(Exception):
     pass

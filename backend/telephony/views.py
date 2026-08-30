@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from core.phone_utils import normalize_to_e164
 from core.master_lead import propagate_global_opt_out
 from core.models import Interaction, Lead, PhoneNumber
 from core.permissions import IsTenantAdmin, IsTenantMember
@@ -54,15 +54,14 @@ def _from_field(obj):
 
 def _sms_from_number(payload):
     frm = _from_field(payload)
-    return _field(frm, "phone_number")
+    return normalize_to_e164(_field(frm, "phone_number"))
 
 
 def _sms_to_number(payload):
     to = _field(payload, "to")
     if isinstance(to, (list, tuple)) and to:
-        return _field(to[0], "phone_number")
-    return _field(to, "phone_number")
-
+        return normalize_to_e164(_field(to[0], "phone_number"))
+    return normalize_to_e164(_field(to, "phone_number"))
 
 class WebRTCCredentialsView(APIView):
     """
@@ -146,8 +145,8 @@ class VoiceWebhookView(APIView):
         if _field(payload, "direction") != "incoming":
             return
 
-        to_number = _field(payload, "to")
-        from_number = _from_field(payload)
+        to_number = normalize_to_e164(_field(payload, "to"))
+        from_number = normalize_to_e164(_from_field(payload))
 
         try:
             phone_number = PhoneNumber.objects.select_related("tenant", "assigned_user").get(
@@ -247,7 +246,7 @@ class SMSSendView(APIView):
 
     def post(self, request):
         lead_id = request.data.get("lead_id")
-        from_number = request.data.get("from_number")
+        from_number = normalize_to_e164((request.data.get("from_number") or "").strip())
         message = request.data.get("message")
 
         if not (lead_id and from_number and message):
@@ -391,7 +390,7 @@ class NumberPurchaseView(APIView):
     permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def post(self, request):
-        phone_number = (request.data.get("phone_number") or "").strip()
+        phone_number = normalize_to_e164((request.data.get("phone_number") or "").strip())
         if not phone_number:
             return Response({"detail": "phone_number is required."}, status=status.HTTP_400_BAD_REQUEST)
 

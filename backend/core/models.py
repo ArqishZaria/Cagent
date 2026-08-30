@@ -7,7 +7,7 @@ consistently at the queryset level.
 """
 
 from decimal import Decimal
-
+from core.phone_utils import normalize_to_e164
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -87,9 +87,13 @@ class PhoneNumber(models.Model):
     monthly_cost = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("1.00"))
     purchased_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        if self.phone_number:
+            self.phone_number = normalize_to_e164(self.phone_number)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.phone_number
-
 
 class Lead(models.Model):
     class Status(models.TextChoices):
@@ -158,9 +162,13 @@ class Lead(models.Model):
             ),
         ]
 
+    def save(self, *args, **kwargs):
+        if self.phone_number:
+            self.phone_number = normalize_to_e164(self.phone_number)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.first_name} {self.last_name} — {self.company}".strip()
-
 
 class Interaction(models.Model):
     class Type(models.TextChoices):
@@ -335,6 +343,11 @@ class MasterLead(models.Model):
                 name="unique_master_phone_when_present",
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        if self.phone_number:
+            self.phone_number = normalize_to_e164(self.phone_number)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.company or self.last_name} ({'blocked' if self.do_not_contact else 'active'})"

@@ -4,7 +4,7 @@ read-only across every tenant.
 """
 
 from django.db.models import Q
-
+from core.phone_utils import normalize_to_e164
 from core.models import Lead, MasterLead
 from core.search_utils import keyword_filter
 
@@ -75,7 +75,7 @@ def pull_from_master(tenant, query, limit, owner=None, scrape_task=None):
 
 def upsert_master_lead(data, query="", source_tenant=None):
     email = (data.get("email") or "").strip()
-    phone = (data.get("phone_number") or "").strip()
+    phone = normalize_to_e164((data.get("phone_number") or "").strip())
     if not email and not phone:
         return None
 
@@ -118,6 +118,7 @@ def upsert_master_lead(data, query="", source_tenant=None):
 
 
 def propagate_global_opt_out(*, phone="", email=""):
+    phone = normalize_to_e164(phone) if phone else phone
     q = Q()
     if phone:
         q |= Q(phone_number=phone)
