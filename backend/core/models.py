@@ -206,7 +206,13 @@ class SupportMessage(models.Model):
         related_name="support_messages",
     )
     is_from_platform_owner = models.BooleanField(default=False)
-    message = models.TextField()
+    message = models.TextField(blank=True)
+    attachment = models.FileField(
+        upload_to="support_attachments/",
+        blank=True,
+        null=True,
+        help_text="Optional proof — e.g. a bank/SadaPay transfer screenshot.",
+    )
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -215,7 +221,6 @@ class SupportMessage(models.Model):
     def __str__(self):
         who = "Platform Owner" if self.is_from_platform_owner else (self.sender or "Unknown")
         return f"[{self.tenant.company_name}] {who}: {self.message[:40]}"
-
 
 class ScrapeTask(models.Model):
     class Status(models.TextChoices):

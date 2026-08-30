@@ -1,74 +1,45 @@
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Download, Loader2, Wallet } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Copy, MessageCircle, Wallet } from "lucide-react";
 import api from "../lib/api";
 import { useWallet } from "../lib/wallet";
-import { QRCodeSVG } from "qrcode.react";
 
-const POLL_MS = 3000;
-const PRESETS = [10, 25, 50, 100];
+function CopyableRow({ label, value }) {
+  const [copied, setCopied] = useState(false);
+  if (!value) return null;
+
+  const copy = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-paper-50 border border-paper-200 px-4 py-3">
+      <div>
+        <p className="label-eyebrow">{label}</p>
+        <p className="font-mono text-sm text-ink-900">{value}</p>
+      </div>
+      <button onClick={copy} className="btn-ghost !p-2" aria-label={`Copy ${label}`}>
+        {copied ? <Check size={15} className="text-live" /> : <Copy size={15} />}
+      </button>
+    </div>
+  );
+}
 
 export default function UploadFinancePage() {
   const { wallet, refresh } = useWallet();
-  const [amount, setAmount] = useState("25");
-  const [quote, setQuote] = useState(null);
-  const [quoting, setQuoting] = useState(false);
-  const [topup, setTopup] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [error, setError] = useState("");
-  const pollRef = useRef(null);
+  const [paymentInfo, setPaymentInfo] = useState(null);
+  const [recentTopups, setRecentTopups] = useState([]);
 
-  useEffect(() => () => clearInterval(pollRef.current), []);
-
-  const loadHistory = () => {
-    api.get("/api/wallet/topups/history/").then((res) => setHistory(res.data || []));
-  };
-  useEffect(loadHistory, []);
-
-  const getQuote = async () => {
-    if (!amount || Number(amount) < 2) return;
-    setQuoting(true);
-    setError("");
-    try {
-      const res = await api.get("/api/wallet/topups/quote/", { params: { amount } });
-      setQuote(res.data);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Couldn't get a quote for that amount.");
-      setQuote(null);
-    } finally {
-      setQuoting(false);
-    }
-  };
-
-  const pay = async () => {
-    setError("");
-    try {
-      const res = await api.post("/api/wallet/topups/", { amount_usd: amount });
-      setTopup(res.data);
-      beginPolling(res.data.id);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Couldn't start that payment.");
-    }
-  };
-
-  const beginPolling = (id) => {
-    clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      const res = await api.get(`/api/wallet/topups/${id}/`);
-      setTopup(res.data);
-      if (res.data.status !== "PENDING") {
-        clearInterval(pollRef.current);
-        if (res.data.status === "PAID") {
-          refresh();
-          loadHistory();
-        }
-      }
-    }, POLL_MS);
-  };
-
-  const reset = () => {
-    setTopup(null);
-    setQuote(null);
-  };
+  useEffect(() => {
+    api.get("/api/wallet/manual-payment-info/").then((res) => setPaymentInfo(res.data));
+    api
+      .get("/api/wallet/transactions/", { params: { type: "TOPUP" } })
+      .then((res) => setRecentTopups(res.data || []));
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -94,116 +65,49 @@ export default function UploadFinancePage() {
 
       <div className="max-w-4xl mx-auto px-6 py-8 grid lg:grid-cols-2 gap-6">
         <section className="card p-6">
-          <h2 className="font-display font-semibold text-lg mb-4 text-ink-900">Top up via Raast</h2>
+          <h2 className="font-display font-semibold text-lg mb-2 text-ink-900">How to top up</h2>
+          <p className="text-sm text-ink-500 mb-5">
+            {paymentInfo?.instructions ||
+              "Transfer any amount to the account below, then send a screenshot of the confirmation in Support Chat."}
+          </p>
 
-          {!topup && (
-            <>
-              <label className="label-eyebrow block mb-1.5">Amount (USD)</label>
-              <div className="flex gap-2 mb-3">
-                <input
-                  className="input-field flex-1"
-                  type="number"
-                  min="2"
-                  step="1"
-                  value={amount}
-                  onChange={(e) => { setAmount(e.target.value); setQuote(null); }}
-                />
-                <button onClick={getQuote} disabled={quoting} className="btn-secondary !px-4">
-                  {quoting ? <Loader2 size={15} className="animate-spin" /> : "Get quote"}
-                </button>
-              </div>
-              <div className="flex gap-2 mb-5">
-                {PRESETS.map((p) => (
-                  <button key={p} onClick={() => { setAmount(String(p)); setQuote(null); }}
-                          className="btn-ghost !py-1.5 !px-3 text-xs">${p}</button>
-                ))}
-              </div>
+          <div className="space-y-2 mb-5">
+            <CopyableRow label="Bank" value={paymentInfo?.bank_name} />
+            <CopyableRow label="Account title" value={paymentInfo?.account_title} />
+            <CopyableRow label="Account number" value={paymentInfo?.account_number} />
+            <CopyableRow label="IBAN" value={paymentInfo?.iban} />
+            <CopyableRow label="SadaPay" value={paymentInfo?.sadapay_number} />
+          </div>
 
-              {quote && (
-                <div className="rounded-lg bg-paper-50 border border-paper-200 p-4 mb-5 text-sm space-y-1.5 font-mono">
-                  <Row label="Base charge" value={`Rs. ${quote.pkr_base}`} />
-                  <Row label="Gateway fee" value={`Rs. ${quote.gateway_fee_pkr}`} />
-                  <Row label="Total to pay (Raast)" value={`Rs. ${quote.total_charged_pkr}`} strong />
-                  <div className="border-t border-paper-200 my-2" />
-                  <Row label="cagent platform fee" value={`$${quote.platform_fee_usd}`} />
-                  <Row label="Net credited to wallet" value={`$${quote.net_credited_usd}`} strong />
-                </div>
-              )}
-
-              {error && <p className="text-xs text-alert mb-4">{error}</p>}
-
-              <button onClick={pay} disabled={!quote} className="btn-amber w-full justify-center !py-3">
-                Pay & generate QR
-              </button>
-            </>
-          )}
-
-          {topup && topup.status === "PENDING" && (
-            <div className="text-center py-4">
-              <p className="text-sm text-ink-600 mb-4">Scan with any banking app (Raast) to complete payment</p>
-              <div className="inline-block p-4 bg-white border border-paper-300 rounded-xl mb-3">
-                {/* qr_payload is a raw Raast QR string — render via any qrcode lib, e.g. `qrcode.react` */}
-                <QRCodeSVG value={topup.qr_payload} size={200} />
-              </div>
-              <p className="font-mono text-sm text-ink-900">Rs. {topup.total_charged_pkr}</p>
-              <p className="text-xs text-ink-400 mt-1">Expires {new Date(topup.expires_at).toLocaleTimeString()}</p>
-              <Loader2 size={16} className="animate-spin mx-auto mt-4 text-signal" />
-            </div>
-          )}
-
-          {topup && topup.status === "PAID" && (
-            <div className="text-center py-6">
-              <CheckCircle2 size={32} className="text-live mx-auto mb-3" />
-              <p className="font-display font-semibold text-ink-900">${topup.net_credited_usd} credited</p>
-              <a href={`/api/wallet/topups/${topup.id}/invoice/`} className="btn-secondary !py-2 !px-4 text-xs mt-4 inline-flex">
-                <Download size={13} /> Download invoice
-              </a>
-              <button onClick={reset} className="block mx-auto text-xs text-signal hover:underline mt-3">
-                Top up again
-              </button>
-            </div>
-          )}
-
-          {topup && ["EXPIRED", "FAILED"].includes(topup.status) && (
-            <div className="text-center py-6">
-              <AlertTriangle size={28} className="text-alert mx-auto mb-3" />
-              <p className="text-sm text-alert">Payment {topup.status.toLowerCase()}.</p>
-              <button onClick={reset} className="text-xs text-signal hover:underline mt-3">Try again</button>
-            </div>
-          )}
+          <div className="flex items-start gap-2.5 rounded-lg bg-signal/5 border border-signal/20 px-4 py-3 text-sm text-ink-700">
+            <MessageCircle size={16} className="text-signal shrink-0 mt-0.5" />
+            <span>
+              Once transferred, click the chat bubble in the bottom-right corner, attach your
+              screenshot, and include your company name. We'll credit your wallet shortly after.
+            </span>
+          </div>
         </section>
 
         <section className="card p-6">
-          <h2 className="font-display font-semibold text-lg mb-4 text-ink-900">Invoice history</h2>
+          <h2 className="font-display font-semibold text-lg mb-4 text-ink-900">Recent top-ups</h2>
           <div className="space-y-2">
-            {history.filter((h) => h.status === "PAID").map((h) => (
-              <div key={h.id} className="ledger-row !py-3">
+            {recentTopups.map((t) => (
+              <div key={t.id} className="ledger-row !py-3">
                 <span>
-                  <span className="block text-ink-900">{h.invoice_number}</span>
-                  <span className="block text-[11px] text-ink-400">{new Date(h.paid_at).toLocaleString()}</span>
+                  <span className="block text-ink-900">{t.description}</span>
+                  <span className="block text-[11px] text-ink-400">
+                    {new Date(t.created_at).toLocaleString()}
+                  </span>
                 </span>
-                <span className="flex items-center gap-3">
-                  <span className="font-mono text-live">+${h.net_credited_usd}</span>
-                  <a href={`/api/wallet/topups/${h.id}/invoice/`} className="text-ink-400 hover:text-signal">
-                    <Download size={14} />
-                  </a>
-                </span>
+                <span className="font-mono text-live">+${Number(t.amount_usd).toFixed(2)}</span>
               </div>
             ))}
-            {history.filter((h) => h.status === "PAID").length === 0 && (
+            {recentTopups.length === 0 && (
               <p className="text-xs text-ink-400 text-center py-8">No top-ups yet.</p>
             )}
           </div>
         </section>
       </div>
-    </div>
-  );
-}
-
-function Row({ label, value, strong }) {
-  return (
-    <div className={`flex justify-between ${strong ? "text-ink-900 font-semibold" : "text-ink-600"}`}>
-      <span>{label}</span><span>{value}</span>
     </div>
   );
 }

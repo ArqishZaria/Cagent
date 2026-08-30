@@ -1,6 +1,6 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
-from wallet.models import PricingRate, TenantWallet, WalletTopup, WalletTransaction
+from wallet.models import ManualCredit, PricingRate, TenantWallet, WalletTopup, WalletTransaction
 
 
 @admin.register(PricingRate)
@@ -28,6 +28,59 @@ class WalletTopupAdmin(admin.ModelAdmin):
     list_filter = ("status",)
     search_fields = ("tenant__company_name", "invoice_number", "gateway_order_id")
     readonly_fields = ("created_at", "paid_at")
+
+
+@admin.register(ManualCredit)
+class ManualCreditAdmin(admin.ModelAdmin):
+    """
+    How you credit a wallet after verifying a bank/SadaPay transfer
+    screenshot sent via Support Chat: fill in tenant, amount, the date they
+    say they paid, and an optional note, then Save. Saving a NEW record
+    immediately credits the wallet via WalletTransaction.apply() — every
+    field then locks (see get_readonly_fields) so this can't be edited into
+    a double-credit later. To correct a mistake, add a new ManualCredit
+    (to add more) or a manual ADJUSTMENT in WalletTransaction directly (to
+    subtract) — never edit an existing ManualCredit.
+    """
+
+    list_display = ("tenant", "amount_usd", "transfer_date", "processed_by", "created_at")
+    list_filter = ("tenant",)
+    search_fields = ("tenant__company_name", "reference_note")
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:  # already saved — lock everything
+            return ("tenant", "amount_usd", "transfer_date", "reference_note", "processed_by", "created_at")
+        return ("processed_by", "created_at")
+
+    def has_delete_permission(self, request, obj=None):
+        # Deleting wouldn't reverse the WalletTransaction it created, which
+        # would silently desync the ledger from what actually happened —
+        # corrections go through a new ManualCredit or ADJUSTMENT instead.
+        return False
+
+    def save_model(self, request, obj, form, change):
+        creating = obj.pk is None
+        if creating:
+            obj.processed_by = request.user
+
+        super().save_model(request, obj, form, change)
+
+        if creating:
+            WalletTransaction.apply(
+                tenant=obj.tenant,
+                type=WalletTransaction.Type.TOPUP,
+                amount_usd=obj.amount_usd,
+                description=(
+                    f"Manual bank/SadaPay transfer verified — {obj.transfer_date}"
+                    f"{f' ({obj.reference_note})' if obj.reference_note else ''}"
+                ),
+                related_manual_credit=obj,
+            )
+            self.message_user(
+                request,
+                f"Credited ${obj.amount_usd} to {obj.tenant.company_name}'s wallet.",
+                messages.SUCCESS,
+            )
 
 
 @admin.register(WalletTransaction)

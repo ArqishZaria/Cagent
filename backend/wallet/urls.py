@@ -1,13 +1,14 @@
 from django.urls import path
 
 from wallet.views import (
-    GatewayWebhookView, PricingRateListView, TopupCreateView,
+    GatewayWebhookView, ManualPaymentInfoView, PricingRateListView, TopupCreateView,
     TopupHistoryView, TopupInvoiceDownloadView, TopupQuoteView, TopupStatusView,
     TransactionBreakdownView, TransactionListView, WalletSummaryView,
 )
 
 urlpatterns = [
     path("", WalletSummaryView.as_view(), name="wallet-summary"),
+    path("manual-payment-info/", ManualPaymentInfoView.as_view(), name="manual-payment-info"),
     path("topups/quote/", TopupQuoteView.as_view(), name="topup-quote"),
     path("topups/", TopupCreateView.as_view(), name="topup-create"),
     path("topups/history/", TopupHistoryView.as_view(), name="topup-history"),

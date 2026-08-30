@@ -4,6 +4,7 @@ import useIdleLogout from "../hooks/useIdleLogout";
 import AppTelnyxProvider from "../lib/TelnyxProvider";
 import CallWidget from "./CallWidget";
 import LowBalanceBanner from "./LowBalanceBanner";
+import SupportChatWidget from "./SupportChatWidget";
 
 const NAV_ITEMS = [
   { to: "/app/prospector", label: "Scraper", icon: Sparkles },
@@ -29,6 +30,7 @@ export default function PortalLayout() {
           </main>
           <CallWidget />
         </div>
+        <SupportChatWidget mode="floating" />
       </div>
     </AppTelnyxProvider>
   );

@@ -3,7 +3,6 @@ import {
   Building2, CheckCircle2, Loader2, Mail, PlusCircle, Search, Users,
 } from "lucide-react";
 import api from "../lib/api";
-import SupportChatWidget from "../components/SupportChatWidget";
 
 /**
  * CompanySettingsPage — the boss-only control room.
@@ -29,7 +28,6 @@ export default function CompanySettingsPage() {
           <NumberAssignmentCard />
         </div>
       </div>
-      <SupportChatWidget mode="floating" />
     </div>
   );
 }

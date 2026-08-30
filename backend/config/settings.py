@@ -256,7 +256,7 @@ FX_RATE_API_URL = os.environ.get("FX_RATE_API_URL", "https://open.er-api.com/v6/
 PLATFORM_OWNER_NOTIFICATION_EMAILS = env_list("PLATFORM_OWNER_NOTIFICATION_EMAILS", "")
 
 # ------------------------------------------------------------------------------------
-# Email (top-up / low-balance notifications)
+# Email (top-up / low-balance notifications, password resets, contact form)
 # ------------------------------------------------------------------------------------
 
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
@@ -266,7 +266,32 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "billing@yourdomain.com")
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://cagent-rho.vercel.app")
 
+# ------------------------------------------------------------------------------------
+# Media (support chat attachments, wallet invoice PDFs)
+# ------------------------------------------------------------------------------------
+
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# ------------------------------------------------------------------------------------
+# Manual bank/SadaPay transfer instructions — shown on Upload Finance while
+# real automated gateway integration (PayFast Pakistan Raast API) is still
+# pending merchant KYC approval. Tenants transfer manually and send proof
+# via Support Chat; the boss reviews and manually credits the wallet via
+# Django admin's ManualCredit (see wallet.admin.ManualCreditAdmin).
+# ------------------------------------------------------------------------------------
+
+MANUAL_PAYMENT_BANK_NAME = os.environ.get("MANUAL_PAYMENT_BANK_NAME", "")
+MANUAL_PAYMENT_ACCOUNT_TITLE = os.environ.get("MANUAL_PAYMENT_ACCOUNT_TITLE", "")
+MANUAL_PAYMENT_ACCOUNT_NUMBER = os.environ.get("MANUAL_PAYMENT_ACCOUNT_NUMBER", "")
+MANUAL_PAYMENT_IBAN = os.environ.get("MANUAL_PAYMENT_IBAN", "")
+MANUAL_PAYMENT_SADAPAY_NUMBER = os.environ.get("MANUAL_PAYMENT_SADAPAY_NUMBER", "")
+MANUAL_PAYMENT_INSTRUCTIONS = os.environ.get(
+    "MANUAL_PAYMENT_INSTRUCTIONS",
+    "Transfer amount, then send a screenshot of the confirmation in the Support Chat.",
+)
 # ------------------------------------------------------------------------------------
 # Production security hardening (only enforced when DEBUG=False)
 # ------------------------------------------------------------------------------------

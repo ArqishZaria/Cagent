@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -188,3 +189,24 @@ class PricingRateListView(APIView):
     def get(self, request):
         rates = PricingRate.objects.filter(is_active=True)
         return Response(PricingRateSerializer(rates, many=True).data)
+
+
+class ManualPaymentInfoView(APIView):
+    """
+    GET /api/wallet/manual-payment-info/ — the bank/SadaPay account details
+    tenants transfer to while real automated gateway integration (PayFast
+    Pakistan) is pending merchant approval. Sourced entirely from env vars
+    so you can update the account details any time without a code change.
+    """
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    def get(self, request):
+        return Response({
+            "bank_name": settings.MANUAL_PAYMENT_BANK_NAME,
+            "account_title": settings.MANUAL_PAYMENT_ACCOUNT_TITLE,
+            "account_number": settings.MANUAL_PAYMENT_ACCOUNT_NUMBER,
+            "iban": settings.MANUAL_PAYMENT_IBAN,
+            "sadapay_number": settings.MANUAL_PAYMENT_SADAPAY_NUMBER,
+            "instructions": settings.MANUAL_PAYMENT_INSTRUCTIONS,
+        })

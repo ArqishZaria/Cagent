@@ -117,6 +117,46 @@ class WalletTopup(models.Model):
         return (amount * Decimal("0.20")).quantize(Decimal("0.01"))
 
 
+class ManualCredit(models.Model):
+    """
+    Audit record for a manually-verified bank/SadaPay transfer top-up.
+
+    Created once by the platform owner in Django admin after confirming a
+    tenant's transfer proof (a screenshot sent via Support Chat) — saving a
+    NEW ManualCredit immediately calls WalletTransaction.apply() to credit
+    the wallet, so the balance and the ledger can never drift apart.
+
+    Once saved, every field becomes read-only in the admin (see
+    wallet.admin.ManualCreditAdmin) to prevent accidental double-crediting
+    via a later edit — a correction should be a new ManualCredit (to add
+    more) or a manual ADJUSTMENT WalletTransaction (to subtract), never an
+    edit to an existing ManualCredit.
+    """
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="manual_credits")
+    amount_usd = models.DecimalField(max_digits=10, decimal_places=2)
+    transfer_date = models.DateField(help_text="Date the tenant says they sent the bank/SadaPay transfer.")
+    reference_note = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="e.g. 'Screenshot in support chat' or a bank transaction reference.",
+    )
+    processed_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Which platform-owner admin verified and entered this credit.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.tenant.company_name} — ${self.amount_usd} ({self.transfer_date})"
+
+
 class WalletTransaction(models.Model):
     """
     Append-only ledger. This table IS the source of truth for both the
@@ -140,6 +180,7 @@ class WalletTransaction(models.Model):
     balance_after_usd = models.DecimalField(max_digits=12, decimal_places=4)
 
     related_topup = models.ForeignKey(WalletTopup, on_delete=models.SET_NULL, null=True, blank=True, related_name="transactions")
+    related_manual_credit = models.ForeignKey(ManualCredit, on_delete=models.SET_NULL, null=True, blank=True, related_name="transactions")
     related_interaction = models.ForeignKey("core.Interaction", on_delete=models.SET_NULL, null=True, blank=True)
     related_phone_number = models.ForeignKey("core.PhoneNumber", on_delete=models.SET_NULL, null=True, blank=True)
     related_scrape_task = models.ForeignKey("core.ScrapeTask", on_delete=models.SET_NULL, null=True, blank=True)
