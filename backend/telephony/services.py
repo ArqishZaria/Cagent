@@ -34,19 +34,24 @@ def get_or_create_webrtc_credential(user):
     """
     Every WebRTC-enabled agent needs a Telnyx "telephony credential" attached
     to our SIP Connection (settings.TELNYX_CONNECTION_ID). We create one the
-    first time a given user asks for WebRTC access and cache the resulting
-    credential_id (keyed by user id) so we don't create a new one on every
-    login.
+    first time a given user asks for WebRTC access and cache both the
+    resulting credential_id AND the Telnyx-generated sip_username (keyed by
+    user id) so we don't create a new one on every login.
+
+    IMPORTANT: Telnyx assigns its own sip_username (e.g.
+    'gencredMHQHW...') when a credential is created — it is NOT the same as
+    our Django username, and call transfers must use this real Telnyx
+    identity, not assigned_user.username.
 
     NOTE: cache.set here uses Django's configured cache backend. In a
     single-process dev setup the default LocMemCache is fine; in production
     with multiple workers, point CACHES at Redis (settings.REDIS_URL) so all
-    workers see the same credential_id, or persist it on CustomUser instead.
+    workers see the same values, or persist them on CustomUser instead.
     """
     cache_key = f"telnyx:webrtc_credential:{user.pk}"
-    credential_id = cache.get(cache_key)
-    if credential_id:
-        return credential_id
+    cached = cache.get(cache_key)
+    if cached:
+        return cached["credential_id"]
 
     resp = requests.post(
         f"{TELNYX_API_BASE}/telephony_credentials",
@@ -60,11 +65,30 @@ def get_or_create_webrtc_credential(user):
     if resp.status_code >= 400:
         raise TelnyxAPIError(f"Failed to create Telnyx credential: {resp.status_code} {resp.text}")
 
-    credential_id = resp.json()["data"]["id"]
+    data = resp.json()["data"]
+    credential_id = data["id"]
+    sip_username = data["sip_username"]
     # Credentials don't expire on their own; cache indefinitely (until evicted).
-    cache.set(cache_key, credential_id, timeout=None)
+    cache.set(cache_key, {"credential_id": credential_id, "sip_username": sip_username}, timeout=None)
     return credential_id
 
+
+def get_agent_sip_username(user):
+    """
+    Returns the real Telnyx sip_username for this agent's WebRTC credential
+    (creating the credential first if the agent has never requested WebRTC
+    access before). This is what call transfers must target — never
+    user.username, which is just our internal Django login name.
+    """
+    cache_key = f"telnyx:webrtc_credential:{user.pk}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached["sip_username"]
+
+    # Not cached yet — creating the credential populates the cache with
+    # both values, so just call the existing function and re-read the cache.
+    get_or_create_webrtc_credential(user)
+    return cache.get(cache_key)["sip_username"]
 
 def generate_webrtc_jwt(user):
     """

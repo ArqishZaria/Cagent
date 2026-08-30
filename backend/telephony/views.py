@@ -17,6 +17,7 @@ from telephony.serializers import PhoneNumberSerializer
 from telephony.services import (
     TelnyxAPIError,
     generate_webrtc_jwt,
+    get_agent_sip_username,
     purchase_number,
     search_available_numbers,
     send_sms,
@@ -208,10 +209,11 @@ class VoiceWebhookView(APIView):
             logger.info("Number %s has no assigned agent; call left unrouted.", to_number)
 
     def _route_to_agent(self, call_control_id, assigned_user):
+        sip_username = get_agent_sip_username(assigned_user)
         call = telnyx.Call()
         call.call_control_id = call_control_id
-        call.transfer(to=f"sip:{assigned_user.username}@sip.telnyx.com")
-
+        call.transfer(to=f"sip:{sip_username}@sip.telnyx.com")
+        
     def _decline_call(self, call_control_id):
         call = telnyx.Call()
         call.call_control_id = call_control_id
