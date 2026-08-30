@@ -51,7 +51,8 @@ export default function LoginPage() {
             <Link to="/forgot-password" className="mkt-link text-xs">Forgot password?</Link>
           </div>
           <PasswordInput
-            className="input-field"
+            className="mkt-input"
+            wrapperClassName="mb-5"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
