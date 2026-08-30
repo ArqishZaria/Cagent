@@ -1,10 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, ClipboardList, LineChart, PhoneCall, ScrollText, Sparkles, Wallet } from "lucide-react";
+import { Building2, ClipboardList, LifeBuoy, LineChart, PhoneCall, ScrollText, Sparkles, UserCircle, Wallet } from "lucide-react";
 import useIdleLogout from "../hooks/useIdleLogout";
 import AppTelnyxProvider from "../lib/TelnyxProvider";
 import CallWidget from "./CallWidget";
 import LowBalanceBanner from "./LowBalanceBanner";
-import SupportChatWidget from "./SupportChatWidget";
 
 const NAV_ITEMS = [
   { to: "/app/prospector", label: "Prospector", icon: Sparkles },
@@ -14,6 +13,8 @@ const NAV_ITEMS = [
   { to: "/app/settings", label: "Settings", icon: Building2 },
   { to: "/app/finance/upload", label: "Billing", icon: Wallet },
   { to: "/app/finance/track", label: "Usage", icon: LineChart },
+  { to: "/app/support", label: "Support", icon: LifeBuoy },
+  { to: "/app/profile", label: "Profile", icon: UserCircle },
 ];
 
 export default function PortalLayout() {
@@ -30,7 +31,6 @@ export default function PortalLayout() {
           </main>
           <CallWidget />
         </div>
-        <SupportChatWidget mode="floating" />
       </div>
     </AppTelnyxProvider>
   );

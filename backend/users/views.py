@@ -6,7 +6,40 @@ from rest_framework.views import APIView
 from core.models import CustomUser
 from core.permissions import IsTenantAdmin, IsTenantMember
 from users.serializers import AgentCreateSerializer, UserSummarySerializer
+from users.serializers import (
+    AgentCreateSerializer, ChangePasswordSerializer, CurrentUserSerializer, UserSummarySerializer,
+)
 
+
+class MeView(APIView):
+    """
+    GET /api/users/me/  — the current user's own profile.
+    PATCH /api/users/me/ — update first_name/last_name/email only; username,
+    role, and tenant are never editable through this endpoint.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(CurrentUserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = CurrentUserSerializer(
+            request.user, data=request.data, partial=True, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(CurrentUserSerializer(request.user).data)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Password updated."})
 
 class UserListView(APIView):
     """
