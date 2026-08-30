@@ -26,11 +26,14 @@ export default function PortalLayout() {
 
   return (
     <AppTelnyxProvider>
-      <div className="flex min-h-screen bg-paper-50 flex-col">
+      {/* Locked to the viewport height — nothing here scrolls except the
+          two regions explicitly marked overflow-y-auto below. This is what
+          keeps the sidebar pinned in place while page content scrolls. */}
+      <div className="h-screen overflow-hidden bg-paper-50 flex flex-col">
         <LowBalanceBanner />
         <div className="flex flex-1 min-h-0">
           <SideNav />
-          <main className="flex-1 min-w-0">
+          <main className="flex-1 min-w-0 overflow-y-auto">
             <Outlet />
           </main>
           <CallWidget />
@@ -49,13 +52,16 @@ function SideNav() {
   };
 
   return (
-    <nav className="w-60 shrink-0 border-r border-paper-200 bg-white hidden md:flex flex-col py-5">
-      <div className="flex items-center gap-2 px-5 mb-6">
+    <nav className="w-60 shrink-0 border-r border-paper-200 bg-white hidden md:flex flex-col py-5 h-full">
+      <div className="flex items-center gap-2 px-5 mb-6 shrink-0">
         <span className="w-2.5 h-2.5 rounded-full bg-signal" />
         <span className="font-display font-bold text-base text-ink-900">Cagent</span>
       </div>
 
-      <div className="flex-1 px-3 space-y-0.5">
+      {/* Only the nav items scroll internally if the list ever grows taller
+          than the viewport — the logo above and sign-out/version below stay
+          fixed in place regardless. */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 space-y-0.5">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -75,7 +81,7 @@ function SideNav() {
         ))}
       </div>
 
-      <div className="px-3 pt-2">
+      <div className="px-3 pt-2 shrink-0">
         <button
           onClick={handleLogout}
           className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium w-full text-left
@@ -86,7 +92,7 @@ function SideNav() {
         </button>
       </div>
 
-      <div className="px-5 pt-4 mt-3 border-t border-paper-200">
+      <div className="px-5 pt-4 mt-3 border-t border-paper-200 shrink-0">
         <p className="text-[11px] text-ink-400 font-mono">v1.01.01 · Cagent</p>
       </div>
     </nav>

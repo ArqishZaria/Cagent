@@ -72,7 +72,7 @@ export default function CrmDialerPage() {
     : leads;
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-full">
       <aside className="w-[320px] shrink-0 border-r border-paper-200 bg-white flex flex-col">
         <div className="px-5 py-4 border-b border-paper-200 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
