@@ -70,7 +70,7 @@ class ManualCreditAdmin(admin.ModelAdmin):
                 tenant=obj.tenant,
                 type=WalletTransaction.Type.TOPUP,
                 amount_usd=obj.amount_usd,
-                description="Wallet credited via manual bank transfer",
+                description="Wallet credited via bank transfer",
                 related_manual_credit=obj,
             )
             self.message_user(
