@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import F, Max, Q
 from django.utils import timezone
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -24,7 +24,12 @@ class LeadViewSet(TenantModelViewSet):
         if params.get("owner"):
             qs = qs.filter(owner_id=params["owner"])
         if params.get("contacted") == "true":
-            qs = qs.filter(contacted_at__isnull=False)
+            qs = qs.filter(contacted_at__isnull=False).annotate(
+                annotated_last_message_at=Max(
+                    "interactions__timestamp",
+                    filter=Q(interactions__type=Interaction.Type.SMS),
+                )
+            ).order_by(F("annotated_last_message_at").desc(nulls_last=True), "-contacted_at")
         elif params.get("contacted") == "false":
             qs = qs.filter(contacted_at__isnull=True)
         if params.get("search"):
@@ -54,10 +59,6 @@ class LeadViewSet(TenantModelViewSet):
 
     @action(detail=True, methods=["post"])
     def contact(self, request, pk=None):
-        """
-        POST /api/leads/<id>/contact/ — the only thing that moves a lead
-        into the CRM/Dialer tab. Idempotent.
-        """
         lead = self.get_object()
         if lead.do_not_contact:
             return Response({"detail": "This lead has opted out and cannot be contacted."}, status=403)
@@ -90,9 +91,6 @@ class InteractionViewSet(TenantModelViewSet):
         assigned_user = serializer.validated_data.get("user") or user
         instance = serializer.save(tenant=user.tenant, user=assigned_user)
 
-        # Belt-and-suspenders: if a call/text got logged for a lead that
-        # was never explicitly "Contacted" from the Leads List, mark it now
-        # so it still shows up in the CRM tab.
         if instance.lead_id and not instance.lead.contacted_at:
             Lead.objects.filter(id=instance.lead_id, contacted_at__isnull=True).update(
                 contacted_at=timezone.now()

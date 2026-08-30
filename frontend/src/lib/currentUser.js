@@ -7,7 +7,7 @@ export function useCurrentUser() {
 
   const refresh = () => {
     setLoading(true);
-    api.get("/api/users/me/").then((res) => setUser(res.data)).finally(() => setLoading(false));
+    api.get("/api/users/profile/").then((res) => setUser(res.data)).finally(() => setLoading(false));
   };
 
   useEffect(refresh, []);

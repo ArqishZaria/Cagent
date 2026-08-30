@@ -1,7 +1,11 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { Building2, ClipboardList, LifeBuoy, LineChart, PhoneCall, ScrollText, Sparkles, UserCircle, Wallet } from "lucide-react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import {
+  Building2, ClipboardList, LifeBuoy, LineChart, LogOut, PhoneCall,
+  ScrollText, Sparkles, UserCircle, Wallet,
+} from "lucide-react";
 import useIdleLogout from "../hooks/useIdleLogout";
 import AppTelnyxProvider from "../lib/TelnyxProvider";
+import { logout } from "../lib/auth";
 import CallWidget from "./CallWidget";
 import LowBalanceBanner from "./LowBalanceBanner";
 
@@ -37,6 +41,13 @@ export default function PortalLayout() {
 }
 
 function SideNav() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
   return (
     <nav className="w-60 shrink-0 border-r border-paper-200 bg-white hidden md:flex flex-col py-5">
       <div className="flex items-center gap-2 px-5 mb-6">
@@ -64,7 +75,18 @@ function SideNav() {
         ))}
       </div>
 
-      <div className="px-5 pt-4 border-t border-paper-200">
+      <div className="px-3 pt-2">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium w-full text-left
+                     text-ink-500 hover:bg-alert/10 hover:text-alert transition"
+        >
+          <LogOut size={17} strokeWidth={2} />
+          Sign out
+        </button>
+      </div>
+
+      <div className="px-5 pt-4 mt-3 border-t border-paper-200">
         <p className="text-[11px] text-ink-400 font-mono">v1.01.01 · Cagent</p>
       </div>
     </nav>

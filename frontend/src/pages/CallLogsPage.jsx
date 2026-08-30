@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { PhoneIncoming, PhoneMissed, PhoneOutgoing, ScrollText } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { MessageSquareText, PhoneIncoming, PhoneMissed, PhoneOutgoing, ScrollText } from "lucide-react";
 import api from "../lib/api";
 
 function formatDuration(seconds) {
@@ -9,22 +10,12 @@ function formatDuration(seconds) {
   return `${String(m).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
 }
 
-/**
- * CallLogsPage — call history, filterable by which owned number was used.
- * An AGENT already only sees their own interactions (InteractionViewSet's
- * agent_owner_field="user"); an ADMIN sees the whole tenant's calls and can
- * narrow down to one number at a time.
- *
- * Inbound calls auto-declined for insufficient wallet balance are logged
- * with missed=true, duration_seconds=0 (see telephony.views.VoiceWebhookView
- * ._handle_call_initiated) — shown here with a red missed-call icon and a
- * "Missed — low balance" label instead of a duration.
- */
 export default function CallLogsPage() {
   const [numbers, setNumbers] = useState([]);
   const [selectedNumberId, setSelectedNumberId] = useState("");
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api
@@ -43,6 +34,11 @@ export default function CallLogsPage() {
       .catch(() => setLogs([]))
       .finally(() => setLoading(false));
   }, [selectedNumberId]);
+
+  const goToChat = (leadId) => {
+    if (!leadId) return;
+    navigate("/app", { state: { leadId } });
+  };
 
   return (
     <div className="min-h-screen">
@@ -99,8 +95,19 @@ export default function CallLogsPage() {
                     </span>
                   </span>
                 </span>
-                <span className={`shrink-0 ${log.missed ? "text-alert font-medium" : "text-ink-600"}`}>
-                  {log.missed ? "Missed — low balance" : formatDuration(log.duration_seconds)}
+                <span className="flex items-center gap-3 shrink-0">
+                  <span className={log.missed ? "text-alert font-medium" : "text-ink-600"}>
+                    {log.missed ? "Missed — low balance" : formatDuration(log.duration_seconds)}
+                  </span>
+                  <button
+                    onClick={() => goToChat(log.lead)}
+                    disabled={!log.lead}
+                    className="btn-ghost !p-1.5"
+                    title="Message this lead"
+                    aria-label="Message this lead"
+                  >
+                    <MessageSquareText size={14} />
+                  </button>
                 </span>
               </div>
             ))}

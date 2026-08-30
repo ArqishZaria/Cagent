@@ -17,6 +17,7 @@ import UploadFinancePage from "./pages/UploadFinance";
 import TrackFinancesPage from "./pages/TrackFinances";
 import ProfilePage from "./pages/ProfilePage";
 import SupportPage from "./pages/SupportPage";
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -27,8 +28,6 @@ export default function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/support" element={<SupportPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
 
         <Route
           path="/app"
@@ -45,6 +44,8 @@ export default function App() {
           <Route path="settings" element={<CompanySettingsPage />} />
           <Route path="finance/upload" element={<UploadFinancePage />} />
           <Route path="finance/track" element={<TrackFinancesPage />} />
+          <Route path="support" element={<SupportPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </BrowserRouter>

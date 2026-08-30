@@ -36,7 +36,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
   const scrollRef = useRef(null);
   const pendingScrollAdjustRef = useRef(null); // { prevHeight } — set right before prepending older messages
   const scrollToBottomRef = useRef(false); // set true after initial load / sending a new message
-
+  
   useEffect(() => {
     if (!lead) {
       setMessages([]);
@@ -58,6 +58,28 @@ export default function LeadChatPanel({ lead, fromNumber }) {
       })
       .catch(() => setMessages([]))
       .finally(() => setInitialLoading(false));
+  }, [lead?.id]);
+
+    // Poll for new messages while a chat is open — inbound texts land via a
+  // backend webhook, so there's no push signal to the browser otherwise.
+  useEffect(() => {
+    if (!lead) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await api.get("/api/interactions/", { params: { lead: lead.id, type: "SMS" } });
+        const latest = [...(res.data?.results || res.data || [])].reverse();
+        setMessages((prev) => {
+          const knownIds = new Set(prev.map((m) => m.id));
+          const newest = latest.slice(-25); // API returns newest page only
+          const merged = [...prev, ...newest.filter((m) => !knownIds.has(m.id))];
+          return merged;
+        });
+        scrollToBottomRef.current = true;
+      } catch {
+        /* transient — try again next tick */
+      }
+    }, 5000);
+    return () => clearInterval(id);
   }, [lead?.id]);
 
   useLayoutEffect(() => {

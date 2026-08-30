@@ -33,7 +33,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm relative">
         <div className="flex items-center gap-2 justify-center mb-8">
           <span className="w-2 h-2 rounded-full bg-mkt-green" />
-          <span className="font-display font-bold text-xl text-white">cagent</span>
+          <span className="font-display font-bold text-xl text-white">Cagent</span>
         </div>
 
         <form onSubmit={submit} className="mkt-card !p-8 hover:!translate-y-0">
@@ -47,9 +47,9 @@ export default function LoginPage() {
 
           <div className="flex items-center justify-between mb-1.5">
             <label className="mkt-eyebrow">Password</label>
-            <Link to="/forgot-password" className="mkt-link text-xs">Forgot password?</Link>
           </div>
           <input className="mkt-input mb-5" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Link to="/forgot-password" className="mkt-link text-xs">Forgot password?</Link>
 
           {error && <p className="text-xs text-red-400 mb-4">{error}</p>}
 
@@ -59,7 +59,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-xs text-mkt-muted mt-6">
-          <Link to="/" className="mkt-link">&larr; Back to cagent</Link>
+          <Link to="/" className="mkt-link">&larr; Back to Cagent</Link>
         </p>
       </div>
     </div>

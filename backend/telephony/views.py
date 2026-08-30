@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 import telnyx
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -63,6 +64,19 @@ def _sms_to_number(payload):
     if isinstance(to, (list, tuple)) and to:
         return normalize_to_e164(_field(to[0], "phone_number"))
     return normalize_to_e164(_field(to, "phone_number"))
+
+
+def _mark_contacted_if_needed(lead):
+    """
+    An inbound call or text is itself a form of contact — the lead should
+    appear directly in the CRM/Dialer chat list the moment they reach out,
+    without anyone needing to press "Contact" in the Leads List first.
+    Idempotent: only writes if not already set.
+    """
+    if not lead.contacted_at:
+        lead.contacted_at = timezone.now()
+        lead.save(update_fields=["contacted_at"])
+
 
 class WebRTCCredentialsView(APIView):
     """
@@ -165,6 +179,11 @@ class VoiceWebhookView(APIView):
             phone_number=from_number,
             defaults={"status": Lead.Status.NEW, "owner": assigned_user},
         )
+        # An inbound call is itself contact — surface this lead directly in
+        # the CRM/Dialer chat list immediately, regardless of how the
+        # balance check below resolves (even a missed/declined call should
+        # still show up as a chat entry so the agent can see it happened).
+        _mark_contacted_if_needed(lead)
 
         # Balance gate — an inbound call still costs the inbound per-minute
         # rate at hangup (bill_call rounds up to at least 1 minute), so a
@@ -213,7 +232,7 @@ class VoiceWebhookView(APIView):
         call = telnyx.Call()
         call.call_control_id = call_control_id
         call.transfer(to=f"sip:{sip_username}@sip.telnyx.com")
-        
+
     def _decline_call(self, call_control_id):
         call = telnyx.Call()
         call.call_control_id = call_control_id
@@ -348,6 +367,11 @@ class SMSWebhookView(APIView):
             phone_number=from_number,
             defaults={"status": Lead.Status.NEW, "owner": assigned_user},
         )
+        # An inbound text is itself contact — surface this lead directly in
+        # the CRM/Dialer chat list immediately, without requiring anyone to
+        # press "Contact" in the Leads List first.
+        _mark_contacted_if_needed(lead)
+
         if any(keyword in text.upper() for keyword in STOP_KEYWORDS):
             lead.do_not_contact = True
             lead.save(update_fields=["do_not_contact"])

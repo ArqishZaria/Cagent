@@ -158,8 +158,31 @@ export default function useTelnyxCall() {
   };
 
   const answer = () => activeCall?.answer();
-  const hangup = () => activeCall?.hangup();
 
+  const hangup = () => {
+    if (!activeCall) return;
+    const call = activeCall;
+
+    try {
+      if (isIncomingRing) {
+        call.reject ? call.reject() : call.hangup?.();
+      } else {
+        call.hangup?.();
+      }
+    } catch {
+      /* best-effort — still close the UI below regardless */
+    }
+
+    // Close the widget immediately rather than waiting on the SDK's own
+    // state transition, which can lag (or never arrive) for calls that
+    // were only ever ringing.
+    if (primaryCallRef.current?.id === call.id) {
+      logCall(call, callMetaRef.current, elapsedRef.current);
+      primaryCallRef.current = null;
+      callMetaRef.current = null;
+      setActiveCall(null);
+    }
+  };
   const acceptWaiting = () => {
     const incoming = waitingCallRef.current;
     if (!incoming) return;

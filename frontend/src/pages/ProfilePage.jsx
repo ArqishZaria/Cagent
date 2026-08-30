@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import { useCurrentUser } from "../lib/currentUser";
-
+import { logout } from "../lib/auth";
 const SUB_STATUS_COLORS = {
   ACTIVE: "bg-live/10 text-live border-live/25",
   PAID_OVERDUE: "bg-alert/10 text-alert border-alert/25",
@@ -16,13 +16,11 @@ export default function ProfilePage() {
   const { user, loading, refresh, isAdmin } = useCurrentUser();
   const navigate = useNavigate();
 
-  const logout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("last_active");
+  const handleLogout = () => {
+    logout();
     navigate("/login");
   };
-
+  
   return (
     <div className="min-h-screen">
       <div className="border-b border-paper-200 bg-white">
