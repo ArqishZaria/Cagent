@@ -70,10 +70,7 @@ class ManualCreditAdmin(admin.ModelAdmin):
                 tenant=obj.tenant,
                 type=WalletTransaction.Type.TOPUP,
                 amount_usd=obj.amount_usd,
-                description=(
-                    f"Manual bank/SadaPay transfer verified — {obj.transfer_date}"
-                    f"{f' ({obj.reference_note})' if obj.reference_note else ''}"
-                ),
+                description="Wallet credited via manual bank transfer",
                 related_manual_credit=obj,
             )
             self.message_user(
