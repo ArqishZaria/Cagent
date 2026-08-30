@@ -313,8 +313,10 @@ class SMSWebhookView(APIView):
         return Response(status=status.HTTP_200_OK)
 
     def _handle_inbound_sms(self, payload):
+        logger.warning("SMS PAYLOAD TYPE: %s VALUE: %r", type(payload), payload)
         from_number = _sms_from_number(payload)
         to_number = _sms_to_number(payload)
+        logger.warning("PARSED from=%r to=%r", from_number, to_number)
         text = _field(payload, "text") or ""
 
         try:
