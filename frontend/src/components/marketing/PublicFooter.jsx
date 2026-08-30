@@ -7,7 +7,7 @@ export default function PublicFooter() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-mkt-green" />
-            <span className="font-display font-bold text-lg text-white">cagent</span>
+            <span className="font-display font-bold text-lg text-white">Cagent</span>
           </div>
           <p className="text-sm text-mkt-muted leading-relaxed max-w-xs">
             One phone system, one CRM, one place your leads actually get worked.

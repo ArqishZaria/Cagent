@@ -14,7 +14,7 @@ function RotatingWord() {
     return () => clearInterval(id);
   }, []);
   return (
-    <span className="relative inline-block h-[1.1em] overflow-hidden align-bottom min-w-[7ch] text-left">
+    <span className="relative inline-block h-[1.1em] overflow-hidden align-bottom w-[11ch] text-center">
       <span key={i} className="block text-mkt-green animate-word-in">{WORDS[i]}</span>
     </span>
   );
@@ -152,21 +152,6 @@ export default function MarketingHome() {
           </div>
         </Reveal>
       </section>
-
-      {/* Stat trio */}
-      <section className="border-t border-mkt-line">
-        <div className="max-w-4xl mx-auto px-6 py-16 grid sm:grid-cols-3 gap-8 text-center">
-          <Reveal delay={0}><Stat value={<CountUp to={25} />} label="leads filled per search, guaranteed" /></Reveal>
-          <Reveal delay={100}><Stat value={<CountUp to={0.5} decimals={2} prefix="$" />} label="flat cost per Prospector search" /></Reveal>
-          <Reveal delay={200}>
-            <Stat
-              value={<span className="inline-flex items-center gap-1"><CountUp to={4.7} decimals={1} /> <Star size={22} className="fill-mkt-yellow text-mkt-yellow" /></span>}
-              label="the rating we're aiming for"
-            />
-          </Reveal>
-        </div>
-      </section>
-
       {/* Story steps */}
       <section className="max-w-5xl mx-auto px-6 py-24 border-t border-mkt-line">
         <Reveal>

@@ -12,10 +12,9 @@ export default function AboutPage() {
 
       <section className="max-w-5xl mx-auto px-6 pt-24 pb-20 grid md:grid-cols-2 gap-16 items-center">
         <Reveal>
-          <span className="mkt-eyebrow inline-block mb-5">About cagent</span>
           <h1 className="font-display font-extrabold text-4xl sm:text-5xl mb-6 leading-[1.08]">
-            Built by people tired of switching tabs to talk to a{" "}
-            <span className="text-mkt-green">customer</span>.
+            Built by people tired of switching tabs to connect with a{" "}
+            <span className="text-mkt-green">customer</span>
           </h1>
           <p className="text-mkt-muted text-lg leading-relaxed">
             Most sales teams run their phone system, their CRM, and their lead lists in three
@@ -43,7 +42,7 @@ export default function AboutPage() {
             See it running on your own numbers.
           </h2>
           <Link to="/contact" className="mkt-btn-primary inline-flex">
-            Talk to us <ArrowRight size={16} />
+            Contact Us<ArrowRight size={16} />
           </Link>
         </Reveal>
       </section>

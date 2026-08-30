@@ -28,7 +28,6 @@ export default function PricingPage() {
 
       <section className="max-w-4xl mx-auto px-6 pt-24 pb-14 text-center">
         <Reveal>
-          <span className="mkt-eyebrow inline-block mb-5">Pricing</span>
           <h1 className="font-display font-extrabold text-4xl sm:text-5xl mb-4">
             <span className="mkt-heading-gradient">One flat fee.</span> Pay only for what you use.
           </h1>

@@ -26,7 +26,6 @@ export default function ContactPage() {
 
       <section className="max-w-2xl mx-auto px-6 pt-24 pb-24">
         <Reveal>
-          <span className="mkt-eyebrow inline-block mb-5">Contact</span>
           <h1 className="font-display font-extrabold text-4xl mb-4">Let's set up your team.</h1>
           <p className="text-mkt-muted mb-10 max-w-lg">
             Tell us a bit about your team and we'll reach out to get your numbers, agents, and

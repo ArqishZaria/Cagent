@@ -28,7 +28,7 @@ export default function PublicNav() {
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-mkt-green" />
-          <span className="font-display font-bold text-lg tracking-tight text-white">cagent</span>
+          <span className="font-display font-bold text-lg tracking-tight text-white">Cagent</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-7">
