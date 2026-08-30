@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
 from core.master_lead import propagate_global_opt_out
 from core.models import Interaction, Lead, PhoneNumber
 from core.permissions import IsTenantAdmin, IsTenantMember
@@ -37,8 +38,22 @@ def _field(obj, name):
     return getattr(obj, name, None)
 
 
+def _from_field(obj):
+    """
+    Telnyx SDK objects expose the sender field as `from_` (with a trailing
+    underscore) because `from` is a reserved Python keyword and can't be used
+    as an attribute name. Plain dict payloads (e.g. in tests) still use the
+    literal key "from". Check both so this works regardless of whether
+    `obj` is an SDK object or a raw dict.
+    """
+    value = _field(obj, "from_")
+    if value is None:
+        value = _field(obj, "from")
+    return value
+
+
 def _sms_from_number(payload):
-    frm = _field(payload, "from")
+    frm = _from_field(payload)
     return _field(frm, "phone_number")
 
 
@@ -132,7 +147,7 @@ class VoiceWebhookView(APIView):
             return
 
         to_number = _field(payload, "to")
-        from_number = _field(payload, "from")
+        from_number = _from_field(payload)
 
         try:
             phone_number = PhoneNumber.objects.select_related("tenant", "assigned_user").get(
@@ -313,10 +328,8 @@ class SMSWebhookView(APIView):
         return Response(status=status.HTTP_200_OK)
 
     def _handle_inbound_sms(self, payload):
-        logger.warning("SMS PAYLOAD TYPE: %s VALUE: %r", type(payload), payload)
         from_number = _sms_from_number(payload)
         to_number = _sms_to_number(payload)
-        logger.warning("PARSED from=%r to=%r", from_number, to_number)
         text = _field(payload, "text") or ""
 
         try:
