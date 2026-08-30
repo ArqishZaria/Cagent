@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Ban, DollarSign, Phone, PhoneOff, Send } from "lucide-react";
 import api from "../lib/api";
@@ -12,16 +12,17 @@ const STATUS_COLORS = {
   LOST: "bg-alert/10 text-alert border-alert/25",
 };
 
+const SCROLL_LOAD_THRESHOLD = 80; // px from top that triggers loading older messages
+
 /**
  * LeadChatPanel — left side of the CRM/Dialer view: lead profile up top,
- * continuous 2-way SMS thread below. `fromNumber` is { id, phone_number }
- * so the call icon can pass fromNumberId through for call-log attribution
- * (see useTelnyxCall's logCall()).
+ * continuous 2-way SMS thread below.
  *
- * callLead now checks wallet balance via useTelnyxCall's startCall (which
- * hits /api/telephony/calls/check-balance/ before ever dialing) — callError
- * surfaces the 402 inline, right under the header, same spot the SMS error
- * shows up near the composer.
+ * Messages load newest-25-first from the backend (Interaction.Meta.ordering
+ * = ["-timestamp"]), reversed here to render oldest-at-top / newest-at-
+ * bottom like a normal chat. Scrolling near the top loads the next older
+ * page (DRF's `next` pagination link) and prepends it, WhatsApp-style,
+ * preserving scroll position so the view doesn't jump.
  */
 export default function LeadChatPanel({ lead, fromNumber }) {
   const { startCall, activeCall, callError } = useTelnyxCall();
@@ -29,19 +30,77 @@ export default function LeadChatPanel({ lead, fromNumber }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderUrl, setOlderUrl] = useState(null);
   const scrollRef = useRef(null);
+  const pendingScrollAdjustRef = useRef(null); // { prevHeight } — set right before prepending older messages
+  const scrollToBottomRef = useRef(false); // set true after initial load / sending a new message
 
   useEffect(() => {
-    if (!lead) return;
+    if (!lead) {
+      setMessages([]);
+      setOlderUrl(null);
+      return;
+    }
+    setInitialLoading(true);
+    setMessages([]);
+    setOlderUrl(null);
     api
       .get("/api/interactions/", { params: { lead: lead.id, type: "SMS" } })
-      .then((res) => setMessages(res.data?.results || res.data || []))
-      .catch(() => setMessages([]));
+      .then((res) => {
+        const data = res.data?.results || res.data || [];
+        // Backend returns newest-first — reverse so the thread reads
+        // oldest-to-newest, top-to-bottom, like a normal chat.
+        setMessages([...data].reverse());
+        setOlderUrl(res.data?.next || null);
+        scrollToBottomRef.current = true;
+      })
+      .catch(() => setMessages([]))
+      .finally(() => setInitialLoading(false));
   }, [lead?.id]);
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  useLayoutEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+
+    if (pendingScrollAdjustRef.current) {
+      // Just prepended older messages — hold the visual scroll position
+      // steady instead of jumping to the top of the now-longer list.
+      const { prevHeight } = pendingScrollAdjustRef.current;
+      node.scrollTop = node.scrollHeight - prevHeight;
+      pendingScrollAdjustRef.current = null;
+      return;
+    }
+
+    if (scrollToBottomRef.current) {
+      node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+      scrollToBottomRef.current = false;
+    }
   }, [messages]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!olderUrl || loadingOlder) return;
+    setLoadingOlder(true);
+    const node = scrollRef.current;
+    pendingScrollAdjustRef.current = { prevHeight: node?.scrollHeight || 0 };
+    try {
+      const res = await api.get(olderUrl);
+      const older = (res.data?.results || []).slice().reverse();
+      setMessages((prev) => [...older, ...prev]);
+      setOlderUrl(res.data?.next || null);
+    } catch {
+      pendingScrollAdjustRef.current = null; // nothing changed — skip the scroll adjustment
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [olderUrl, loadingOlder]);
+
+  const handleScroll = (e) => {
+    if (e.target.scrollTop <= SCROLL_LOAD_THRESHOLD) {
+      loadOlderMessages();
+    }
+  };
 
   if (!lead) {
     return (
@@ -62,6 +121,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
         from_number: fromNumber.phone_number,
         message: text,
       });
+      scrollToBottomRef.current = true;
       setMessages((prev) => [
         ...prev,
         { id: `local-${Date.now()}`, direction: "OUTBOUND", message_body: text, timestamp: new Date().toISOString() },
@@ -135,8 +195,12 @@ export default function LeadChatPanel({ lead, fromNumber }) {
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3 bg-paper-50/60">
-        {messages.length === 0 && <p className="text-xs text-ink-400">No messages yet.</p>}
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-5 space-y-3 bg-paper-50/60">
+        {loadingOlder && (
+          <p className="text-center text-[11px] text-ink-400 font-mono pb-1">Loading earlier messages…</p>
+        )}
+        {initialLoading && <p className="text-xs text-ink-400 text-center">Loading conversation…</p>}
+        {!initialLoading && messages.length === 0 && <p className="text-xs text-ink-400">No messages yet.</p>}
         {messages.map((m) => (
           <div
             key={m.id}
