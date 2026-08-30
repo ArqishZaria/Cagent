@@ -36,9 +36,6 @@ export default function ProfilePage() {
               <h1 className="text-2xl font-display font-semibold text-ink-900">Profile</h1>
             </div>
           </div>
-          <button onClick={logout} className="btn-secondary !text-xs !py-2">
-            <LogOut size={14} /> Sign out
-          </button>
         </div>
       </div>
 
