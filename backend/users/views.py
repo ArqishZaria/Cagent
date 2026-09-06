@@ -1,13 +1,19 @@
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.utils.decorators import method_decorator
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
+from django_ratelimit.decorators import ratelimit
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import CustomUser
 from core.permissions import IsTenantAdmin, IsTenantMember
-from users.serializers import AgentCreateSerializer, UserSummarySerializer
+from users.notifications import send_password_reset_email
 from users.serializers import (
-    AgentCreateSerializer, ChangePasswordSerializer, CurrentUserSerializer, UserSummarySerializer,
+    AgentCreateSerializer, ChangePasswordSerializer, CurrentUserSerializer,
+    PasswordResetConfirmSerializer, PasswordResetRequestSerializer, UserSummarySerializer,
 )
 
 
@@ -40,6 +46,82 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"detail": "Password updated."})
+
+
+@method_decorator(ratelimit(key="ip", rate="5/h", method="POST", block=False), name="post")
+class PasswordResetRequestView(APIView):
+    """
+    POST /api/users/password-reset/  Body: {"email": "..."}
+
+    Public — no auth. Always returns the same generic response regardless
+    of whether the email is registered, so this endpoint can't be used to
+    enumerate accounts. Rate-limited per IP to deter abuse.
+
+    authentication_classes is explicitly emptied (not just permission_classes
+    = AllowAny) because DRF runs authentication before permissions — if the
+    caller's browser has a stale/expired JWT sitting in localStorage (the
+    frontend's shared `api` instance auto-attaches it to every request),
+    JWTAuthentication would 401 this endpoint before AllowAny is ever
+    consulted. Same fix already used by VoiceWebhookView/SMSWebhookView/
+    GatewayWebhookView.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    GENERIC_RESPONSE = {"detail": "If an account exists for that email, a reset link is on its way."}
+
+    def post(self, request):
+        if getattr(request, "limited", False):
+            return Response(
+                {"detail": "Too many attempts — please try again later."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].strip()
+
+        user = (
+            CustomUser.objects.filter(email__iexact=email, is_active=True)
+            .exclude(email="")
+            .first()
+        )
+        if user:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = PasswordResetTokenGenerator().make_token(user)
+            send_password_reset_email(user, uid, token)
+
+        return Response(self.GENERIC_RESPONSE)
+
+
+@method_decorator(ratelimit(key="ip", rate="10/h", method="POST", block=False), name="post")
+class PasswordResetConfirmView(APIView):
+    """
+    POST /api/users/password-reset/confirm/
+    Body: {"uid": "...", "token": "...", "new_password": "..."}
+
+    Public — no auth (the token itself is the credential). Same
+    authentication_classes = [] reasoning as PasswordResetRequestView above.
+    Rate-limited too, since a guessable-in-theory uid/token pair costs
+    nothing to hit repeatedly over POST.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        if getattr(request, "limited", False):
+            return Response(
+                {"detail": "Too many attempts — please try again later."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Password updated. You can now sign in."})
+
 
 class UserListView(APIView):
     """

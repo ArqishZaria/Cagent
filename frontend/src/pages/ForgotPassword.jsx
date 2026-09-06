@@ -1,19 +1,29 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { KeyRound, Mail } from "lucide-react";
+import api from "../lib/api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    setError("");
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      await api.post("/api/users/password-reset/", { email });
       setSubmitted(true);
-    }, 600);
+    } catch {
+      // Backend never actually 4xx's for a bad-but-valid email (to avoid
+      // leaking which emails are registered) — this only fires on rate
+      // limiting or a malformed address.
+      setError("Couldn't send that — check the email address and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -40,7 +50,16 @@ export default function ForgotPasswordPage() {
                 Enter your email and we'll send you a link to set a new password.
               </p>
               <form onSubmit={submit}>
-                <input className="mkt-input mb-5" type="email" placeholder="you@company.com" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+                <input
+                  className="mkt-input mb-3"
+                  type="email"
+                  placeholder="you@company.com"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus
+                />
+                {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
                 <button type="submit" disabled={submitting} className="mkt-btn-primary w-full justify-center">
                   <Mail size={16} />
                   {submitting ? "Sending…" : "Send reset link"}

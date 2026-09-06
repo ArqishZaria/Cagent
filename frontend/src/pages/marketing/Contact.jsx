@@ -3,21 +3,28 @@ import { CheckCircle2, Mail } from "lucide-react";
 import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
 import Reveal from "../../components/marketing/Reveal";
+import api from "../../lib/api";
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", company: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    setError("");
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      await api.post("/api/contact/", form);
       setSubmitted(true);
-    }, 700);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Couldn't send that — please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -51,7 +58,8 @@ export default function ContactPage() {
               <input className="mkt-input sm:col-span-1" placeholder="Your name" required value={form.name} onChange={update("name")} />
               <input className="mkt-input sm:col-span-1" type="email" placeholder="Work email" required value={form.email} onChange={update("email")} />
               <input className="mkt-input sm:col-span-2" placeholder="Company name" value={form.company} onChange={update("company")} />
-              <textarea className="mkt-input sm:col-span-2 h-32 resize-none" placeholder="What does your team need?" value={form.message} onChange={update("message")} />
+              <textarea className="mkt-input sm:col-span-2 h-32 resize-none" placeholder="What does your team need?" required value={form.message} onChange={update("message")} />
+              {error && <p className="text-xs text-red-400 sm:col-span-2">{error}</p>}
               <button type="submit" disabled={submitting} className="mkt-btn-primary sm:col-span-2 justify-center !py-3">
                 <Mail size={16} />
                 {submitting ? "Sending…" : "Send message"}

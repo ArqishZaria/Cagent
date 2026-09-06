@@ -6,6 +6,7 @@ import PricingPage from "./pages/marketing/Pricing";
 import ContactPage from "./pages/marketing/Contact";
 import LoginPage from "./pages/Login";
 import ForgotPasswordPage from "./pages/ForgotPassword";
+import ResetPasswordPage from "./pages/ResetPassword";
 import RequireAuth from "./components/RequireAuth";
 import PortalLayout from "./components/PortalLayout";
 import CrmDialerPage from "./pages/CrmDialerView";
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route
           path="/app"
