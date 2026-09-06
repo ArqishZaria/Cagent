@@ -71,7 +71,7 @@ function AccountDetailsCard({ user, onSaved }) {
     setSaving(true);
     setFeedback(null);
     try {
-      await api.patch("/api/users/me/", form);
+      await api.patch("/api/users/profile/", form);
       setFeedback({ type: "success", text: "Saved." });
       onSaved();
     } catch {
