@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
 from core.phone_utils import normalize_to_e164
 from core.master_lead import propagate_global_opt_out
 from core.models import Interaction, Lead, PhoneNumber
@@ -25,7 +26,15 @@ from telephony.services import (
 )
 from telephony.webhook_utils import verify_telnyx_webhook
 from wallet.models import PricingRate, TenantWallet
-from wallet.services import InsufficientBalance, bill_call, bill_sms, count_sms_segments, require_balance
+from wallet.services import (
+    InsufficientBalance,
+    PlatformFeeOverdue,
+    bill_call,
+    bill_sms,
+    count_sms_segments,
+    require_balance,
+    require_platform_fee_current,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,15 +89,27 @@ def _mark_contacted_if_needed(lead):
 
 class WebRTCCredentialsView(APIView):
     """
-    Gated on wallet balance: a tenant at $0 or below simply can't get a
-    WebRTC login token, so the dialer never even connects. Per-second call
-    cost is still billed at hangup (see bill_call below) — this gate only
-    stops calling from starting at all once the wallet is empty.
+    Gated on the recurring platform fee AND wallet balance: a tenant with
+    an overdue platform fee, or a $0 wallet, simply can't get a WebRTC
+    login token, so the dialer never even connects. Per-second call cost
+    is still billed at hangup (see bill_call below) — these gates only
+    stop calling from starting at all.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def post(self, request):
+        try:
+            require_platform_fee_current(request.user.tenant)
+        except PlatformFeeOverdue as exc:
+            return Response(
+                {
+                    "detail": f"Platform fee (${exc.amount_due}) is overdue — top up to keep calling.",
+                    "code": "platform_fee_overdue",
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
         wallet, _ = TenantWallet.objects.get_or_create(tenant=request.user.tenant)
         if wallet.balance_usd <= 0:
             return Response(
@@ -110,16 +131,27 @@ class CallEligibilityView(APIView):
     POST /api/telephony/calls/check-balance/
 
     The frontend hits this right before dialing (useTelnyxCall.startCall),
-    so an outbound call never even rings if the wallet can't cover at least
-    one minute at the outbound rate — bill_call() always rounds up to a
-    minimum of 1 minute, so that's the real minimum cost of any call.
-    Mirrors the inbound auto-decline gate in
+    so an outbound call never even rings if the platform fee is overdue or
+    the wallet can't cover at least one minute at the outbound rate —
+    bill_call() always rounds up to a minimum of 1 minute, so that's the
+    real minimum cost of any call. Mirrors the inbound auto-decline gate in
     VoiceWebhookView._handle_call_initiated below.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def post(self, request):
+        try:
+            require_platform_fee_current(request.user.tenant)
+        except PlatformFeeOverdue as exc:
+            return Response(
+                {
+                    "detail": f"Platform fee (${exc.amount_due}) is overdue — top up to keep calling.",
+                    "code": "platform_fee_overdue",
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
         per_minute = PricingRate.get_cost(PricingRate.Key.CALL_OUTBOUND_PER_MINUTE)
         try:
             require_balance(request.user.tenant, per_minute)
@@ -181,9 +213,34 @@ class VoiceWebhookView(APIView):
         )
         # An inbound call is itself contact — surface this lead directly in
         # the CRM/Dialer chat list immediately, regardless of how the
-        # balance check below resolves (even a missed/declined call should
-        # still show up as a chat entry so the agent can see it happened).
+        # platform-fee/balance checks below resolve (even a missed/declined
+        # call should still show up as a chat entry so the agent can see
+        # it happened).
         _mark_contacted_if_needed(lead)
+
+        # Platform-fee gate — a tenant locked out for an overdue platform
+        # fee can't receive calls either, same reasoning as the balance
+        # gate right below it.
+        try:
+            require_platform_fee_current(tenant)
+        except PlatformFeeOverdue:
+            logger.info(
+                "Auto-declining inbound call to %s — platform fee overdue for tenant %s",
+                to_number, tenant.company_name,
+            )
+            Interaction.objects.create(
+                tenant=tenant,
+                user=assigned_user,
+                lead=lead,
+                type=Interaction.Type.CALL,
+                direction=Interaction.Direction.INBOUND,
+                phone_number=phone_number,
+                duration_seconds=0,
+                missed=True,
+                notes="Auto-declined — platform fee overdue.",
+            )
+            self._decline_call(call_control_id)
+            return
 
         # Balance gate — an inbound call still costs the inbound per-minute
         # rate at hangup (bill_call rounds up to at least 1 minute), so a
@@ -258,9 +315,9 @@ class VoiceWebhookView(APIView):
 
 class SMSSendView(APIView):
     """
-    Checks wallet balance BEFORE sending (so we never pay Telnyx for a
-    message we then can't bill for), then bills the actual segment count
-    after a successful send.
+    Checks the platform fee and wallet balance BEFORE sending (so we never
+    pay Telnyx for a message we then can't bill for), then bills the
+    actual segment count after a successful send.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -285,6 +342,17 @@ class SMSSendView(APIView):
             return Response(
                 {"detail": "This lead has opted out (STOP/UNSUBSCRIBE/CANCEL) and cannot be contacted."},
                 status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            require_platform_fee_current(request.user.tenant)
+        except PlatformFeeOverdue as exc:
+            return Response(
+                {
+                    "detail": f"Platform fee (${exc.amount_due}) is overdue — top up to keep texting.",
+                    "code": "platform_fee_overdue",
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
             )
 
         sender_number = get_object_or_404(
@@ -387,10 +455,10 @@ class SMSWebhookView(APIView):
             phone_number=phone_number,
         )
         # Inbound SMS is billed too — Telnyx charges for receiving, not just
-        # sending. No balance pre-check here since we can't refuse to
-        # *receive* a text; if this dips a tenant below $0, the low-balance
-        # notification (fired from bill_usage -> WalletTransaction.apply)
-        # still goes out.
+        # sending. No balance/platform-fee pre-check here since we can't
+        # refuse to *receive* a text; if this dips a tenant below $0, the
+        # low-balance notification (fired from bill_usage ->
+        # WalletTransaction.apply) still goes out.
         bill_sms(interaction)
 
 

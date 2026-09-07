@@ -28,9 +28,10 @@ const ENDED_STATES = ["hangup", "destroy", "purge"];
  *
  * startCall is now async: it first hits
  * POST /api/telephony/calls/check-balance/ (telephony.views.CallEligibilityView)
- * so a call never even rings if the wallet can't cover at least one minute
- * at the outbound rate. On a 402, `callError` is set and the call never
- * starts — surfaced by LeadChatPanel right under the lead header.
+ * so a call never even rings if the platform fee is overdue or the wallet
+ * can't cover at least one minute at the outbound rate. On a 402,
+ * `callError` is set and the call never starts — surfaced by LeadChatPanel
+ * right under the lead header.
  */
 export default function useTelnyxCall() {
   const client = useContext(TelnyxRTCContext);
@@ -140,11 +141,14 @@ export default function useTelnyxCall() {
     try {
       await api.post("/api/telephony/calls/check-balance/");
     } catch (err) {
-      setCallError(
-        err.response?.data?.code === "insufficient_balance"
-          ? "Wallet balance too low to place this call — top up to keep calling."
-          : "Couldn't verify wallet balance. Try again."
-      );
+      const code = err.response?.data?.code;
+      if (code === "platform_fee_overdue") {
+        setCallError("Platform fee overdue — top up your wallet to keep calling.");
+      } else if (code === "insufficient_balance") {
+        setCallError("Wallet balance too low to place this call — top up to keep calling.");
+      } else {
+        setCallError("Couldn't verify wallet balance. Try again.");
+      }
       return;
     }
 

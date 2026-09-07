@@ -204,10 +204,15 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # django-celery-beat's DatabaseScheduler syncs entries defined here into the
 # DB on startup, so this is the single source of truth for periodic tasks —
 # no separate admin step needed to create them.
+
 CELERY_BEAT_SCHEDULE = {
     "charge-monthly-number-rentals": {
         "task": "wallet.tasks.charge_monthly_number_rentals",
-        "schedule": crontab(day_of_month=1, hour=3, minute=0),  # 3am on the 1st, not a rolling 30 days
+        "schedule": crontab(day_of_month=1, hour=3, minute=0),
+    },
+    "charge-platform-fees": {
+        "task": "wallet.tasks.charge_platform_fees",
+        "schedule": crontab(hour=3, minute=30),  # daily — due dates are per-tenant, not calendar-fixed
     },
 }
 
@@ -311,3 +316,5 @@ if not DEBUG:
         origin if origin.startswith("http") else f"https://{origin}"
         for origin in CORS_ALLOWED_ORIGINS
     ]
+    
+

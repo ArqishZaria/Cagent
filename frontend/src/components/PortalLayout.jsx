@@ -8,6 +8,7 @@ import AppTelnyxProvider from "../lib/TelnyxProvider";
 import { logout } from "../lib/auth";
 import CallWidget from "./CallWidget";
 import LowBalanceBanner from "./LowBalanceBanner";
+import PlatformFeeOverdueBanner from "./PlatformFeeOverdueBanner";
 
 const NAV_ITEMS = [
   { to: "/app/prospector", label: "Prospector", icon: Sparkles },
@@ -30,6 +31,7 @@ export default function PortalLayout() {
           two regions explicitly marked overflow-y-auto below. This is what
           keeps the sidebar pinned in place while page content scrolls. */}
       <div className="h-screen overflow-hidden bg-paper-50 flex flex-col">
+        <PlatformFeeOverdueBanner />
         <LowBalanceBanner />
         <div className="flex flex-1 min-h-0">
           <SideNav />

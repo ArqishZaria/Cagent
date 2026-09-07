@@ -68,3 +68,30 @@ def notify_low_balance(wallet):
         recipient_list=recipients,
         fail_silently=True,
     )
+    
+def notify_platform_fee_overdue(tenant, amount_due):
+    recipients = _tenant_admin_recipients(tenant)
+    if recipients:
+        send_mail(
+            subject=f"Platform fee overdue — ${amount_due} due on your cagent account",
+            message=(
+                f"Your monthly platform fee of ${amount_due} couldn't be deducted because "
+                f"your wallet balance is too low. Calling, texting, and lead search are "
+                f"paused until you top up — everything else in the portal still works. "
+                f"Recharge any time in the Upload Finance tab and the lockout clears "
+                f"automatically."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipients,
+            fail_silently=True,
+        )
+
+    platform_recipients = _platform_owner_recipients()
+    if platform_recipients:
+        send_mail(
+            subject=f"⚠️ Platform fee overdue — {tenant.company_name} (${amount_due})",
+            message=f"{tenant.company_name}'s wallet couldn't cover the ${amount_due} monthly platform fee.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=platform_recipients,
+            fail_silently=True,
+        )

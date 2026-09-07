@@ -4,7 +4,7 @@ import api from "../lib/api";
 
 const TYPE_LABELS = {
   USAGE_CALL: "Calls", USAGE_SMS: "SMS", USAGE_LEAD_SEARCH: "Lead searches",
-  USAGE_NUMBER_RENTAL: "Number rental", USAGE_OTHER: "Other",
+  USAGE_NUMBER_RENTAL: "Number rental", USAGE_PLATFORM_FEE: "Platform fee", USAGE_OTHER: "Other",
 };
 
 export default function TrackFinancesPage() {

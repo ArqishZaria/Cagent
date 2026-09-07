@@ -9,13 +9,16 @@ import logging
 import math
 import re
 import uuid
+from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 import requests
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django.utils.module_loading import import_string
 
+from core.models import Tenant
 from wallet.models import PricingRate, TenantWallet, WalletTopup, WalletTransaction
 
 logger = logging.getLogger(__name__)
@@ -28,6 +31,18 @@ class InsufficientBalance(Exception):
         self.required = required
         self.available = available
         super().__init__(f"Insufficient wallet balance: need ${required}, have ${available}")
+
+
+class PlatformFeeOverdue(Exception):
+    """
+    Raised by require_platform_fee_current() when a tenant's recurring
+    platform fee couldn't be deducted and they're locked out of billable
+    actions (calls, SMS, lead search) until they recharge.
+    """
+
+    def __init__(self, amount_due):
+        self.amount_due = amount_due
+        super().__init__(f"Platform fee of ${amount_due} is overdue — recharge the wallet to continue.")
 
 
 def get_gateway():
@@ -129,6 +144,11 @@ def confirm_topup_paid(topup: WalletTopup) -> WalletTopup:
         related_topup=topup,
     )
 
+    # If this tenant was locked out on an unpaid recurring platform fee,
+    # this top-up may now cover it — try immediately rather than waiting
+    # for tomorrow's daily sweep (wallet.tasks.charge_platform_fees).
+    try_charge_platform_fee(topup.tenant)
+
     from wallet.pdf import generate_topup_invoice_pdf
     from wallet.notifications import notify_topup_success
     generate_topup_invoice_pdf(topup)
@@ -144,6 +164,67 @@ def require_balance(tenant, cost_usd: Decimal):
     wallet = TenantWallet.objects.get(tenant=tenant)
     if not wallet.has_sufficient_balance(cost_usd):
         raise InsufficientBalance(cost_usd, wallet.balance_usd)
+
+
+def require_platform_fee_current(tenant):
+    """
+    Raises PlatformFeeOverdue if this tenant is currently locked out of
+    billable actions (calls, SMS, lead search) for an unpaid recurring
+    platform fee. Deliberately narrow: read-only areas of the app (leads,
+    call logs, settings, billing itself) are never gated by this — only
+    the billable-action call sites check it.
+    """
+    if tenant.subscription_status == Tenant.SubscriptionStatus.PAID_OVERDUE:
+        cost = PricingRate.get_cost(PricingRate.Key.PLATFORM_FEE_MONTHLY)
+        raise PlatformFeeOverdue(cost)
+
+
+def try_charge_platform_fee(tenant) -> bool:
+    """
+    Charges the recurring monthly platform fee for `tenant` if (and only
+    if) it's currently due. Called from two places:
+      - wallet.tasks.charge_platform_fees, the daily beat sweep
+      - confirm_topup_paid, immediately after a top-up lands, so an
+        overdue tenant is unblocked the instant they recharge rather than
+        waiting for tomorrow's sweep
+
+    Locks the Tenant row for the duration so a beat-task run and a
+    top-up-triggered call can never both charge the same cycle.
+
+    Returns True if nothing was due, or the due fee was successfully
+    charged (tenant is/stays ACTIVE). Returns False if a fee is due but
+    the wallet still can't cover it (tenant is/stays PAID_OVERDUE).
+    """
+    with transaction.atomic():
+        locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+
+        if (
+            locked_tenant.next_platform_fee_charge_at is None
+            or locked_tenant.next_platform_fee_charge_at > timezone.now()
+        ):
+            return True
+
+        cost = PricingRate.get_cost(PricingRate.Key.PLATFORM_FEE_MONTHLY)
+        wallet = TenantWallet.objects.get(tenant=locked_tenant)
+
+        if wallet.balance_usd < cost:
+            if locked_tenant.subscription_status != Tenant.SubscriptionStatus.PAID_OVERDUE:
+                locked_tenant.subscription_status = Tenant.SubscriptionStatus.PAID_OVERDUE
+                locked_tenant.save(update_fields=["subscription_status"])
+                from wallet.notifications import notify_platform_fee_overdue
+                notify_platform_fee_overdue(locked_tenant, cost)
+            return False
+
+        bill_usage(
+            locked_tenant,
+            type=WalletTransaction.Type.USAGE_PLATFORM_FEE,
+            cost_usd=cost,
+            description="Monthly platform fee",
+        )
+        locked_tenant.next_platform_fee_charge_at = timezone.now() + timedelta(days=30)
+        locked_tenant.subscription_status = Tenant.SubscriptionStatus.ACTIVE
+        locked_tenant.save(update_fields=["next_platform_fee_charge_at", "subscription_status"])
+        return True
 
 
 def bill_usage(tenant, *, type, cost_usd: Decimal, description="", **refs) -> WalletTransaction:

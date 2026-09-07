@@ -40,8 +40,11 @@ export default function AgenticProspectorPage() {
       startedAtRef.current = Date.now();
       beginPolling(res.data.id);
     } catch (err) {
+      const code = err.response?.data?.code;
       if (err.response?.status === 429) {
         setError("Rate limit reached — max 5 searches per hour. Try again shortly.");
+      } else if (code === "platform_fee_overdue") {
+        setError("Your platform fee is overdue — top up your wallet to keep prospecting.");
       } else if (err.response?.status === 402) {
         setError("Wallet balance too low for a search. Top up to keep prospecting.");
       } else {

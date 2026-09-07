@@ -38,7 +38,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
   const scrollRef = useRef(null);
   const pendingScrollAdjustRef = useRef(null); // { prevHeight } — set right before prepending older messages
   const scrollToBottomRef = useRef(false); // set true after initial load / sending a new message
-  
+
   useEffect(() => {
     if (!lead) {
       setMessages([]);
@@ -152,7 +152,12 @@ export default function LeadChatPanel({ lead, fromNumber }) {
       ]);
       setDraft("");
     } catch (err) {
-      setError(err.response?.data?.detail || "Message couldn't be sent.");
+      const code = err.response?.data?.code;
+      setError(
+        code === "platform_fee_overdue"
+          ? "Platform fee overdue — top up your wallet to keep texting."
+          : err.response?.data?.detail || "Message couldn't be sent."
+      );
     } finally {
       setSending(false);
     }

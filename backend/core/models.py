@@ -20,7 +20,7 @@ class Tenant(models.Model):
 
     class BillingMode(models.TextChoices):
         MANUAL = "MANUAL", "Manual"
-
+    
     company_name = models.CharField(max_length=255)
     subscription_status = models.CharField(
         max_length=20,
@@ -34,8 +34,17 @@ class Tenant(models.Model):
     )
     last_payment_date = models.DateField(null=True, blank=True)
     subscription_end_date = models.DateField(null=True, blank=True)
+    next_platform_fee_charge_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "When the next recurring platform fee should be deducted. Rolls "
+            "forward 30 days from whichever date it was last successfully "
+            "charged (not a fixed calendar day) — a late payment shifts "
+            "every future due date by the same delay."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
-
     class Meta:
         ordering = ["company_name"]
 

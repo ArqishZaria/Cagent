@@ -43,14 +43,13 @@ class PricingRate(models.Model):
     class Key(models.TextChoices):
         CALL_OUTBOUND_PER_MINUTE = "call_outbound_per_minute", "Outbound call — per minute"
         CALL_INBOUND_PER_MINUTE = "call_inbound_per_minute", "Inbound call — per minute"
-        SMS_PER_SEGMENT = "sms_per_segment", "SMS — per segment (legacy, unused)"
         SMS_OUTBOUND_PER_SEGMENT = "sms_outbound_per_segment", "Outbound SMS — per segment"
         SMS_INBOUND_PER_SEGMENT = "sms_inbound_per_segment", "Inbound SMS — per segment"
         NUMBER_MONTHLY_RENTAL = "number_monthly_rental", "Phone number — monthly rental"
         NUMBER_SMS_CAPABILITY_FEE = "number_sms_capability_fee", "Phone number — SMS capability add-on (monthly)"
         LEAD_SEARCH_PER_QUERY = "lead_search_per_query", "Prospector web search — per search (flat, up to 25 leads)"
         LEAD_VERIFICATION_PER_ROW = "lead_verification_per_row", "Bulk upload — per-row verification"
-        
+        PLATFORM_FEE_MONTHLY = "platform_fee_monthly", "Platform fee — monthly recurring"
     key = models.CharField(max_length=64, choices=Key.choices, unique=True)
     cost_usd = models.DecimalField(max_digits=8, decimal_places=4)
     unit = models.CharField(max_length=32, default="per minute")
@@ -172,9 +171,9 @@ class WalletTransaction(models.Model):
         USAGE_LEAD_SEARCH = "USAGE_LEAD_SEARCH", "Lead search"
         USAGE_LEAD_VERIFICATION = "USAGE_LEAD_VERIFICATION", "Lead verification"
         USAGE_NUMBER_RENTAL = "USAGE_NUMBER_RENTAL", "Number rental"
+        USAGE_PLATFORM_FEE = "USAGE_PLATFORM_FEE", "Platform fee"
         USAGE_OTHER = "USAGE_OTHER", "Other"
         ADJUSTMENT = "ADJUSTMENT", "Manual adjustment"
-
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="wallet_transactions")
     type = models.CharField(max_length=24, choices=Type.choices)
     amount_usd = models.DecimalField(max_digits=10, decimal_places=4)  # signed: + for TOPUP/ADJUSTMENT credit, - for USAGE_*

@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 
 from wallet.models import ManualCredit, PricingRate, TenantWallet, WalletTopup, WalletTransaction
+from wallet.services import try_charge_platform_fee
 
 
 @admin.register(PricingRate)
@@ -41,6 +42,11 @@ class ManualCreditAdmin(admin.ModelAdmin):
     a double-credit later. To correct a mistake, add a new ManualCredit
     (to add more) or a manual ADJUSTMENT in WalletTransaction directly (to
     subtract) — never edit an existing ManualCredit.
+
+    Saving also immediately retries any overdue recurring platform fee
+    (try_charge_platform_fee), same as an automated top-up does — so a
+    manually-credited tenant is unblocked right away instead of waiting
+    for tomorrow's daily sweep.
     """
 
     list_display = ("tenant", "amount_usd", "transfer_date", "processed_by", "created_at")
@@ -73,6 +79,7 @@ class ManualCreditAdmin(admin.ModelAdmin):
                 description="Wallet credited via bank transfer",
                 related_manual_credit=obj,
             )
+            try_charge_platform_fee(obj.tenant)
             self.message_user(
                 request,
                 f"Credited ${obj.amount_usd} to {obj.tenant.company_name}'s wallet.",

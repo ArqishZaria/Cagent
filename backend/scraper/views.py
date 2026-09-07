@@ -17,7 +17,7 @@ from core.permissions import IsTenantMember
 from crm.serializers import LeadSerializer
 from scraper.tasks import process_lead_upload, run_lead_scrape
 from wallet.models import PricingRate
-from wallet.services import InsufficientBalance, require_balance
+from wallet.services import InsufficientBalance, PlatformFeeOverdue, require_balance, require_platform_fee_current
 
 ALLOWED_UPLOAD_EXTENSIONS = (".csv", ".xlsx", ".xls")
 
@@ -45,11 +45,11 @@ class ScrapeSearchView(APIView):
     POST /api/scraper/search/
     Body: {"query": "roofing companies in Austin TX"}
 
-    Rate-limited to 5 searches per user per hour, AND gated on wallet
-    balance ($0.50/search per PricingRate.Key.LEAD_SEARCH_PER_QUERY) — the
-    balance check happens before the ScrapeTask is even created, so a
-    tenant with insufficient funds never queues (and never gets charged
-    for) a search that can't run.
+    Rate-limited to 5 searches per user per hour, gated on the recurring
+    platform fee being current, AND gated on wallet balance
+    ($0.50/search per PricingRate.Key.LEAD_SEARCH_PER_QUERY) — every check
+    happens before the ScrapeTask is even created, so a tenant that can't
+    pay never queues (and never gets charged for) a search that can't run.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -64,6 +64,17 @@ class ScrapeSearchView(APIView):
         query = (request.data.get("query") or "").strip()
         if not query:
             return Response({"detail": "query is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            require_platform_fee_current(request.user.tenant)
+        except PlatformFeeOverdue as exc:
+            return Response(
+                {
+                    "detail": f"Your platform fee (${exc.amount_due}) is overdue — top up your wallet to keep searching.",
+                    "code": "platform_fee_overdue",
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
 
         cost = PricingRate.get_cost(PricingRate.Key.LEAD_SEARCH_PER_QUERY)
         try:

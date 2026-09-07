@@ -210,3 +210,22 @@ class ManualPaymentInfoView(APIView):
             "sadapay_number": settings.MANUAL_PAYMENT_SADAPAY_NUMBER,
             "instructions": settings.MANUAL_PAYMENT_INSTRUCTIONS,
         })
+        
+        
+        
+class WalletSummaryView(APIView):
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    def get(self, request):
+        wallet, _ = TenantWallet.objects.get_or_create(tenant=request.user.tenant)
+        data = TenantWalletSerializer(wallet).data
+        data["is_low"] = wallet.balance_usd <= wallet.low_balance_threshold_usd
+
+        tenant = request.user.tenant
+        data["platform_fee_overdue"] = tenant.subscription_status == tenant.SubscriptionStatus.PAID_OVERDUE
+        data["next_platform_fee_charge_at"] = tenant.next_platform_fee_charge_at
+        try:
+            data["platform_fee_amount_usd"] = str(PricingRate.get_cost(PricingRate.Key.PLATFORM_FEE_MONTHLY))
+        except ValueError:
+            data["platform_fee_amount_usd"] = None
+        return Response(data)
