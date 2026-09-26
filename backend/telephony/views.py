@@ -539,9 +539,6 @@ class NumberPurchaseView(APIView):
                 return Response({"detail": "monthly_cost must be a valid decimal."}, status=status.HTTP_400_BAD_REQUEST)
 
         number = PhoneNumber.objects.create(
-            tenant=request.user.tenant, phone_number=phone_number,
-            telnyx_order_id=order.get("id", ""), is_active=True, **create_kwargs,
-                    number = PhoneNumber.objects.create(
             tenant=request.user.tenant,
             phone_number=phone_number,
             telnyx_order_id=order.get("id", ""),
@@ -549,7 +546,7 @@ class NumberPurchaseView(APIView):
             is_active=True,
             **create_kwargs,
         )
-        )
+        
 
         from wallet.services import bill_number_purchase
         bill_number_purchase(number)
