@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
 import { ChevronDown, HelpCircle, LifeBuoy, Search } from "lucide-react";
 import { useCurrentUser } from "../lib/currentUser";
 import SupportChatWidget from "../components/SupportChatWidget";
+import api from "../lib/api";
+import { useEffect, useMemo, useState } from "react";
 
 const FAQS = [
   {
@@ -42,7 +43,7 @@ const FAQS = [
     items: [
       { q: "How do I top up my wallet?", a: "Go to Billing → Upload finance for transfer instructions, then send your payment proof through the chat (Admins only) so it can be credited." },
       { q: "What happens at $0 balance?", a: "Calling, texting, and lead searches pause until you top up — nothing else in the portal is affected." },
-      { q: "Where can I see what I've spent?", a: "The Usage tab breaks spend down by type (calls, SMS, searches, number rental) alongside your current rates." },
+      { q: "Where can I see what I've spent?", a: "The Usage tab breaks spend down by type (calls, SMS, searches, number rental) — current rates are on this page, in the panel to the right." },
     ],
   },
   {
@@ -51,6 +52,7 @@ const FAQS = [
       { q: "How do I add a teammate?", a: "Admins can add agent accounts under Settings → Add an agent. New accounts always get Agent access." },
       { q: "How do I assign a number to someone?", a: "In Settings → Assign numbers, pick a teammate from the dropdown next to any owned number." },
       { q: "Can an Agent see every lead?", a: "No — Agents only see leads, calls, and texts assigned to them. Admins see everything for the company." },
+      { q: "How do I deactivate a phone number?", a: "In Settings → Phone numbers, click Deactivate next to an owned number. This permanently releases it from Telnyx — it can't be re-enabled afterward." },
     ],
   },
   {
@@ -65,6 +67,11 @@ const FAQS = [
 export default function SupportPage() {
   const { isAdmin, loading } = useCurrentUser();
   const [query, setQuery] = useState("");
+  const [rates, setRates] = useState([]);
+
+  useEffect(() => {
+    if (isAdmin) api.get("/api/wallet/pricing-rates/").then((res) => setRates(res.data)).catch(() => {});
+  }, [isAdmin]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -124,6 +131,20 @@ export default function SupportPage() {
         </div>
 
         <div className="lg:sticky lg:top-6">
+          {!loading && isAdmin && rates.length > 0 && (
+            <div className="card p-5 mb-4">
+              <h3 className="font-display font-semibold text-sm text-ink-900 mb-3">Current rates</h3>
+              <div className="space-y-1.5">
+                {rates.map((r) => (
+                  <div key={r.key} className="flex justify-between text-xs px-2 py-1.5 rounded-lg bg-paper-50">
+                    <span className="text-ink-600">{r.label}</span>
+                    <span className="font-mono text-ink-900">${r.cost_usd} {r.unit}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {!loading && isAdmin && (
             <div className="card !p-0 overflow-hidden h-[560px]">
               <SupportChatWidget mode="embedded" />

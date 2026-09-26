@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from telephony.views import (
     CallEligibilityView,
+    NumberDeactivateView,
     NumberPurchaseView,
     NumberSearchView,
     NumberViewSet,
@@ -23,4 +24,5 @@ urlpatterns = [
     path("webhooks/sms/", SMSWebhookView.as_view(), name="sms-webhook"),
     path("numbers/search/", NumberSearchView.as_view(), name="number-search"),
     path("numbers/purchase/", NumberPurchaseView.as_view(), name="number-purchase"),
+    path("numbers/<int:pk>/deactivate/", NumberDeactivateView.as_view(), name="number-deactivate"),
 ] + router.urls

@@ -175,6 +175,11 @@ def purchase_number(phone_number: str) -> dict:
         raise TelnyxAPIError(f"Number purchase failed: {resp.status_code} {resp.text}")
 
     order_data = resp.json()["data"]
+    # Telnyx's number-order response includes the actual phone_number
+    # resource IDs (separate from the order ID) — this is what release_number()
+    # needs later, since DELETE /v2/phone_numbers/{id} takes that ID, not the order ID.
+    phone_number_resource_id = (order_data.get("phone_numbers") or [{}])[0].get("id", "")
+    order_data["_phone_number_resource_id"] = phone_number_resource_id
 
     # Assign to the Messaging Profile for SMS. Non-fatal on failure — the
     # number is still usable for voice immediately either way, but we log
@@ -199,3 +204,20 @@ def purchase_number(phone_number: str) -> dict:
             )
 
     return order_data
+
+
+
+def release_number(telnyx_phone_number_id: str):
+    """
+    Permanently releases a number back to Telnyx's pool — this is what
+    makes it disappear from the Telnyx portal too. Irreversible: the exact
+    number can't be re-acquired afterward, it would need to be purchased
+    as a new number search result if it's ever offered again.
+    """
+    resp = requests.delete(
+        f"{TELNYX_API_BASE}/phone_numbers/{telnyx_phone_number_id}",
+        headers=_telnyx_headers(),
+        timeout=15,
+    )
+    if resp.status_code >= 400:
+        raise TelnyxAPIError(f"Number release failed: {resp.status_code} {resp.text}")

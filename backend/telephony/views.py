@@ -21,6 +21,7 @@ from telephony.services import (
     generate_webrtc_jwt,
     get_agent_sip_username,
     purchase_number,
+    release_number,
     search_available_numbers,
     send_sms,
 )
@@ -479,6 +480,18 @@ class NumberSearchView(APIView):
         return Response({"results": results})
 
 
+
+class NumberViewSet(TenantModelViewSet):
+    serializer_class = PhoneNumberSerializer
+    queryset = PhoneNumber.objects.all().order_by("-purchased_at")
+    agent_owner_field = None
+
+    def get_permissions(self):
+        if self.request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            return [IsAuthenticated(), IsTenantAdmin()]
+        return [IsAuthenticated(), IsTenantMember()]
+    
+    
 class NumberPurchaseView(APIView):
     permission_classes = [IsAuthenticated, IsTenantAdmin]
 
@@ -486,9 +499,30 @@ class NumberPurchaseView(APIView):
         phone_number = normalize_to_e164((request.data.get("phone_number") or "").strip())
         if not phone_number:
             return Response({"detail": "phone_number is required."}, status=status.HTTP_400_BAD_REQUEST)
-
         if PhoneNumber.objects.filter(phone_number=phone_number).exists():
             return Response({"detail": "This number has already been purchased."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            require_platform_fee_current(request.user.tenant)
+        except PlatformFeeOverdue as exc:
+            return Response(
+                {"detail": f"Platform fee (${exc.amount_due}) is overdue — top up to buy a number.",
+                 "code": "platform_fee_overdue"},
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
+        first_month_cost = (
+            PricingRate.get_cost(PricingRate.Key.NUMBER_MONTHLY_RENTAL)
+            + PricingRate.get_cost(PricingRate.Key.NUMBER_SMS_CAPABILITY_FEE)
+        )
+        try:
+            require_balance(request.user.tenant, first_month_cost)
+        except InsufficientBalance as exc:
+            return Response(
+                {"detail": f"Insufficient wallet balance to buy a number (need ${exc.required}, have ${exc.available}).",
+                 "code": "insufficient_balance"},
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
 
         try:
             order = purchase_number(phone_number)
@@ -505,22 +539,57 @@ class NumberPurchaseView(APIView):
                 return Response({"detail": "monthly_cost must be a valid decimal."}, status=status.HTTP_400_BAD_REQUEST)
 
         number = PhoneNumber.objects.create(
+            tenant=request.user.tenant, phone_number=phone_number,
+            telnyx_order_id=order.get("id", ""), is_active=True, **create_kwargs,
+                    number = PhoneNumber.objects.create(
             tenant=request.user.tenant,
             phone_number=phone_number,
             telnyx_order_id=order.get("id", ""),
+            telnyx_phone_number_id=order.get("_phone_number_resource_id", ""),
             is_active=True,
             **create_kwargs,
         )
+        )
+
+        from wallet.services import bill_number_purchase
+        bill_number_purchase(number)
 
         return Response(PhoneNumberSerializer(number).data, status=status.HTTP_201_CREATED)
+    
+class NumberDeactivateView(APIView):
+    """
+    POST /api/telephony/numbers/<id>/deactivate/  (ADMIN only)
 
+    Releases the number from Telnyx (removing it from the Telnyx portal
+    entirely) and marks it inactive locally. Once released, this exact
+    number cannot be re-enabled — buying it back would mean a fresh
+    purchase of whatever's available, if anything.
+    """
 
-class NumberViewSet(TenantModelViewSet):
-    serializer_class = PhoneNumberSerializer
-    queryset = PhoneNumber.objects.all().order_by("-purchased_at")
-    agent_owner_field = None
+    permission_classes = [IsAuthenticated, IsTenantAdmin]
 
-    def get_permissions(self):
-        if self.request.method in ("POST", "PUT", "PATCH", "DELETE"):
-            return [IsAuthenticated(), IsTenantAdmin()]
-        return [IsAuthenticated(), IsTenantMember()]
+    def post(self, request, pk):
+        number = get_object_or_404(PhoneNumber, pk=pk, tenant=request.user.tenant)
+
+        if not number.is_active:
+            return Response({"detail": "This number is already deactivated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if number.telnyx_phone_number_id:
+            try:
+                release_number(number.telnyx_phone_number_id)
+            except TelnyxAPIError as exc:
+                logger.exception("Telnyx release failed for %s", number.phone_number)
+                return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        else:
+            logger.warning(
+                "Number %s has no telnyx_phone_number_id on file — deactivating locally only; "
+                "release it manually in the Telnyx portal.",
+                number.phone_number,
+            )
+
+        number.is_active = False
+        number.deactivated_at = timezone.now()
+        number.assigned_user = None
+        number.save(update_fields=["is_active", "deactivated_at", "assigned_user"])
+
+        return Response(PhoneNumberSerializer(number).data)

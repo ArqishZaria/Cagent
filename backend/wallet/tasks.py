@@ -23,9 +23,15 @@ logger = logging.getLogger(__name__)
 def charge_monthly_number_rentals(self):
     rental_cost = PricingRate.get_cost(PricingRate.Key.NUMBER_MONTHLY_RENTAL)
     sms_fee = PricingRate.get_cost(PricingRate.Key.NUMBER_SMS_CAPABILITY_FEE)
+    this_month = timezone.now().date().replace(day=1)
+
+    due = [
+        n for n in PhoneNumber.objects.filter(is_active=True).select_related("tenant")
+        if not n.last_billed_at or n.last_billed_at < this_month
+    ]
 
     charged = 0
-    for number in PhoneNumber.objects.filter(is_active=True).select_related("tenant"):
+    for number in due:
         try:
             bill_usage(
                 number.tenant,
@@ -34,13 +40,14 @@ def charge_monthly_number_rentals(self):
                 description=f"Monthly rental — {number.phone_number}",
                 related_phone_number=number,
             )
+            number.last_billed_at = this_month
+            number.save(update_fields=["last_billed_at"])
             charged += 1
         except Exception:
             logger.exception("Failed to charge monthly rental for number %s", number.phone_number)
 
-    logger.info("charge_monthly_number_rentals: charged %d/%d numbers", charged, PhoneNumber.objects.filter(is_active=True).count())
+    logger.info("charge_monthly_number_rentals: charged %d/%d due numbers", charged, len(due))
     return charged
-
 
 @shared_task(bind=True)
 def charge_platform_fees(self):

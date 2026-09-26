@@ -323,3 +323,22 @@ def bill_lead_search(tenant, scrape_task, total_leads_returned: int):
         description=f'Prospector search: "{scrape_task.query}" — {total_leads_returned} leads',
         related_scrape_task=scrape_task,
     )
+    
+def bill_number_purchase(phone_number):
+    """
+    Charges the first month's rental + SMS capability fee the instant a
+    number is purchased, and stamps last_billed_at so the monthly sweep
+    knows this month is already covered.
+    """
+    rental_cost = PricingRate.get_cost(PricingRate.Key.NUMBER_MONTHLY_RENTAL)
+    sms_fee = PricingRate.get_cost(PricingRate.Key.NUMBER_SMS_CAPABILITY_FEE)
+
+    bill_usage(
+        phone_number.tenant,
+        type=WalletTransaction.Type.USAGE_NUMBER_RENTAL,
+        cost_usd=rental_cost + sms_fee,
+        description=f"Number purchase — first month rental — {phone_number.phone_number}",
+        related_phone_number=phone_number,
+    )
+    phone_number.last_billed_at = timezone.now().date().replace(day=1)
+    phone_number.save(update_fields=["last_billed_at"])

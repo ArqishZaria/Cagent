@@ -7,14 +7,6 @@ import PasswordInput from "../components/PasswordInput";
 
 /**
  * CompanySettingsPage — the boss-only control room.
- *
- * NOTE ON BACKEND COVERAGE: the employee-creation flow below calls the real
- * POST /api/users/manage/ endpoint built on Day 3. The number search/buy/
- * assign flow calls /api/telephony/numbers/... endpoints that match Part 2D
- * of the spec ("Search & Buy APIs... restricted to ADMIN users") but have
- * NOT been built yet in Days 1-4 — that's Telnyx number purchasing, still
- * pending. This UI is wired to the contract those endpoints should expose;
- * flagging clearly so it isn't mistaken for already-working end-to-end.
  */
 export default function CompanySettingsPage() {
   return (
@@ -49,13 +41,14 @@ function PageHeader() {
   );
 }
 
-// --- Number purchasing ---------------------------------------------------------------
+// --- Number purchasing / deactivation ---------------------------------------------------------------
 
 function NumberPurchaseCard() {
   const [areaCode, setAreaCode] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState([]);
   const [purchasingId, setPurchasingId] = useState(null);
+  const [deactivatingId, setDeactivatingId] = useState(null);
   const [owned, setOwned] = useState([]);
   const [error, setError] = useState("");
 
@@ -85,14 +78,34 @@ function NumberPurchaseCard() {
 
   const purchase = async (phoneNumber) => {
     setPurchasingId(phoneNumber);
+    setError("");
     try {
       await api.post("/api/telephony/numbers/purchase/", { phone_number: phoneNumber });
       setResults((prev) => prev.filter((r) => r.phone_number !== phoneNumber));
       loadOwned();
-    } catch {
-      setError(`Couldn't purchase ${phoneNumber}.`);
+    } catch (err) {
+      const code = err.response?.data?.code;
+      if (code === "platform_fee_overdue") setError("Platform fee overdue — top up before buying a number.");
+      else if (code === "insufficient_balance") setError(`Not enough wallet balance to buy ${phoneNumber} — top up first.`);
+      else setError(`Couldn't purchase ${phoneNumber}.`);
     } finally {
       setPurchasingId(null);
+    }
+  };
+
+  const deactivate = async (numberId, phoneNumberDisplay) => {
+    if (!window.confirm(`Permanently release ${phoneNumberDisplay}? This releases it from Telnyx too and can't be undone.`)) {
+      return;
+    }
+    setDeactivatingId(numberId);
+    setError("");
+    try {
+      await api.post(`/api/telephony/numbers/${numberId}/deactivate/`);
+      loadOwned();
+    } catch (err) {
+      setError(err.response?.data?.detail || `Couldn't deactivate ${phoneNumberDisplay}.`);
+    } finally {
+      setDeactivatingId(null);
     }
   };
 
@@ -154,9 +167,18 @@ function NumberPurchaseCard() {
           <p className="label-eyebrow mb-3">Owned numbers</p>
           <div className="grid sm:grid-cols-2 gap-2">
             {owned.map((n) => (
-              <div key={n.id} className="flex items-center gap-2 rounded-lg bg-paper-50 px-3 py-2">
-                <CheckCircle2 size={14} className="text-live shrink-0" />
-                <span className="font-mono text-xs text-ink-800 truncate">{n.phone_number}</span>
+              <div key={n.id} className="flex items-center justify-between gap-2 rounded-lg bg-paper-50 px-3 py-2">
+                <span className="flex items-center gap-2 min-w-0">
+                  <CheckCircle2 size={14} className="text-live shrink-0" />
+                  <span className="font-mono text-xs text-ink-800 truncate">{n.phone_number}</span>
+                </span>
+                <button
+                  onClick={() => deactivate(n.id, n.phone_number)}
+                  disabled={deactivatingId === n.id}
+                  className="text-[11px] text-alert hover:underline shrink-0 disabled:opacity-50"
+                >
+                  {deactivatingId === n.id ? "Releasing…" : "Deactivate"}
+                </button>
               </div>
             ))}
           </div>
@@ -180,11 +202,10 @@ function TeamCard() {
     setSubmitting(true);
     setFeedback(null);
     try {
-      // Real Day 3 endpoint — ADMIN-only, server always forces role=AGENT.
       await api.post("/api/users/manage/", form);
       setFeedback({ type: "success", text: `Agent account created for ${form.username}.` });
       setForm({ username: "", email: "", first_name: "", last_name: "", password: "" });
-      } catch (err) {
+    } catch (err) {
       const data = err.response?.data;
       let message = "Couldn't create that account. Check the fields and try again.";
       if (data) {

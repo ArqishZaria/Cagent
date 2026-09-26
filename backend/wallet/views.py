@@ -131,55 +131,6 @@ class GatewayWebhookView(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-class TransactionListView(APIView):
-    """GET /api/wallet/transactions/?type=USAGE_CALL — the Track Finances feed."""
-
-    permission_classes = [IsAuthenticated, IsTenantMember]
-
-    def get(self, request):
-        qs = WalletTransaction.objects.filter(tenant=request.user.tenant)
-        if request.query_params.get("type"):
-            qs = qs.filter(type=request.query_params["type"])
-        qs = qs.order_by("-created_at")[:200]
-        return Response(WalletTransactionSerializer(qs, many=True).data)
-
-
-class TransactionBreakdownView(APIView):
-    """
-    GET /api/wallet/transactions/breakdown/ — totals per usage type, PLUS the
-    grand total, which by construction always equals (sum of all TOPUP) -
-    (current balance) — the reconciliation the boss asked for, with no
-    possibility of drift since it's all read off the same ledger table.
-    """
-
-    permission_classes = [IsAuthenticated, IsTenantMember]
-
-    def get(self, request):
-        from django.db.models import Sum
-        tenant = request.user.tenant
-
-        usage_qs = (
-            WalletTransaction.objects.filter(tenant=tenant, type__startswith="USAGE_")
-            .values("type")
-            .annotate(total=Sum("amount_usd"))
-            .order_by("type")
-        )
-        total_usage = sum((abs(row["total"]) for row in usage_qs), Decimal("0.00"))
-        total_topups = (
-            WalletTransaction.objects.filter(tenant=tenant, type="TOPUP")
-            .aggregate(total=Sum("amount_usd"))["total"] or Decimal("0.00")
-        )
-        wallet = TenantWallet.objects.get(tenant=tenant)
-
-        return Response({
-            "breakdown": [{"type": row["type"], "total_usd": str(abs(row["total"]))} for row in usage_qs],
-            "total_usage_usd": str(total_usage),
-            "total_topups_usd": str(total_topups),
-            "current_balance_usd": str(wallet.balance_usd),
-            # Sanity check exposed to the frontend: should always be ~0.
-            "reconciliation_delta": str(total_topups - total_usage - wallet.balance_usd),
-        })
-
 
 class PricingRateListView(APIView):
     """GET /api/wallet/pricing-rates/ — tenant ADMINs get read-only visibility."""
@@ -229,3 +180,47 @@ class WalletSummaryView(APIView):
         except ValueError:
             data["platform_fee_amount_usd"] = None
         return Response(data)
+    
+    
+class TransactionListView(APIView):
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    def get(self, request):
+        qs = WalletTransaction.objects.filter(tenant=request.user.tenant)
+        if request.query_params.get("type"):
+            qs = qs.filter(type=request.query_params["type"])
+        if request.query_params.get("date_from"):
+            qs = qs.filter(created_at__date__gte=request.query_params["date_from"])
+        if request.query_params.get("date_to"):
+            qs = qs.filter(created_at__date__lte=request.query_params["date_to"])
+        qs = qs.order_by("-created_at")[:200]
+        return Response(WalletTransactionSerializer(qs, many=True).data)
+
+
+class TransactionBreakdownView(APIView):
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    def get(self, request):
+        from django.db.models import Sum
+        tenant = request.user.tenant
+
+        usage_qs = WalletTransaction.objects.filter(tenant=tenant, type__startswith="USAGE_")
+        if request.query_params.get("date_from"):
+            usage_qs = usage_qs.filter(created_at__date__gte=request.query_params["date_from"])
+        if request.query_params.get("date_to"):
+            usage_qs = usage_qs.filter(created_at__date__lte=request.query_params["date_to"])
+        usage_qs = usage_qs.values("type").annotate(total=Sum("amount_usd")).order_by("type")
+
+        total_usage = sum((abs(row["total"]) for row in usage_qs), Decimal("0.00"))
+        total_topups = (
+            WalletTransaction.objects.filter(tenant=tenant, type="TOPUP")
+            .aggregate(total=Sum("amount_usd"))["total"] or Decimal("0.00")
+        )
+        wallet = TenantWallet.objects.get(tenant=tenant)
+        return Response({
+            "breakdown": [{"type": r["type"], "total_usd": str(abs(r["total"]))} for r in usage_qs],
+            "total_usage_usd": str(total_usage),
+            "total_topups_usd": str(total_topups),
+            "current_balance_usd": str(wallet.balance_usd),
+            "reconciliation_delta": str(total_topups - total_usage - wallet.balance_usd),
+        })
