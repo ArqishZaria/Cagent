@@ -210,11 +210,15 @@ class TransactionBreakdownView(APIView):
             WalletTransaction.objects.filter(tenant=tenant, type="TOPUP")
             .aggregate(total=Sum("amount_usd"))["total"] or Decimal("0.00")
         )
+        total_adjustments = (
+            WalletTransaction.objects.filter(tenant=tenant, type="ADJUSTMENT")
+            .aggregate(total=Sum("amount_usd"))["total"] or Decimal("0.00")
+        )
         wallet = TenantWallet.objects.get(tenant=tenant)
         return Response({
             "breakdown": [{"type": r["type"], "total_usd": str(abs(r["total"]))} for r in usage_qs],
             "total_usage_usd": str(total_usage),
             "total_topups_usd": str(total_topups),
             "current_balance_usd": str(wallet.balance_usd),
-            "reconciliation_delta": str(total_topups - total_usage - wallet.balance_usd),
+            "reconciliation_delta": str(total_topups + total_adjustments - total_usage - wallet.balance_usd),
         })

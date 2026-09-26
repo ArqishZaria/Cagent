@@ -14,7 +14,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 import requests
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.module_loading import import_string
 
@@ -284,7 +284,7 @@ def bill_call(interaction):
     if interaction.type != interaction.Type.CALL or not interaction.duration_seconds:
         return
     if WalletTransaction.objects.filter(related_interaction=interaction).exists():
-        return  # already billed — guards against a webhook retry double-charging
+        return  # fast pre-check, avoids a round trip in the common case
 
     minutes = max(1, math.ceil(interaction.duration_seconds / 60))
     key = (
@@ -295,14 +295,20 @@ def bill_call(interaction):
     per_minute = PricingRate.get_cost(key)
     cost = (per_minute * minutes).quantize(Decimal("0.0001"))
 
-    bill_usage(
-        interaction.tenant,
-        type=WalletTransaction.Type.USAGE_CALL,
-        cost_usd=cost,
-        description=f"{interaction.direction.title()} call — {minutes} min",
-        related_interaction=interaction,
-        related_phone_number=interaction.phone_number,
-    )
+    try:
+        bill_usage(
+            interaction.tenant,
+            type=WalletTransaction.Type.USAGE_CALL,
+            cost_usd=cost,
+            description=f"{interaction.direction.title()} call — {minutes} min",
+            related_interaction=interaction,
+            related_phone_number=interaction.phone_number,
+        )
+    except IntegrityError:
+        logger.info(
+            "bill_call: interaction %s already billed concurrently — skipped duplicate charge.",
+            interaction.id,
+        )
 
 
 def bill_sms(interaction):
@@ -320,14 +326,20 @@ def bill_sms(interaction):
     per_segment = PricingRate.get_cost(rate_key)
     cost = (per_segment * segments).quantize(Decimal("0.0001"))
 
-    bill_usage(
-        interaction.tenant,
-        type=WalletTransaction.Type.USAGE_SMS,
-        cost_usd=cost,
-        description=f"{interaction.direction.title()} SMS — {segments} segment(s)",
-        related_interaction=interaction,
-        related_phone_number=interaction.phone_number,
-    )
+    try:
+        bill_usage(
+            interaction.tenant,
+            type=WalletTransaction.Type.USAGE_SMS,
+            cost_usd=cost,
+            description=f"{interaction.direction.title()} SMS — {segments} segment(s)",
+            related_interaction=interaction,
+            related_phone_number=interaction.phone_number,
+        )
+    except IntegrityError:
+        logger.info(
+            "bill_sms: interaction %s already billed concurrently — skipped duplicate charge.",
+            interaction.id,
+        )
 
 
 def bill_lead_search(tenant, scrape_task, total_leads_returned: int):
@@ -343,13 +355,19 @@ def bill_lead_search(tenant, scrape_task, total_leads_returned: int):
         return
 
     cost = PricingRate.get_cost(PricingRate.Key.LEAD_SEARCH_PER_QUERY)
-    bill_usage(
-        tenant,
-        type=WalletTransaction.Type.USAGE_LEAD_SEARCH,
-        cost_usd=cost,
-        description=f'Prospector search: "{scrape_task.query}" — {total_leads_returned} leads',
-        related_scrape_task=scrape_task,
-    )
+    try:
+        bill_usage(
+            tenant,
+            type=WalletTransaction.Type.USAGE_LEAD_SEARCH,
+            cost_usd=cost,
+            description=f'Prospector search: "{scrape_task.query}" — {total_leads_returned} leads',
+            related_scrape_task=scrape_task,
+        )
+    except IntegrityError:
+        logger.info(
+            "bill_lead_search: scrape_task %s already billed concurrently — skipped duplicate charge.",
+            scrape_task.id,
+        )
     
 def bill_number_purchase(phone_number):
     """
