@@ -138,9 +138,8 @@ class ExistingLeadsSearchView(APIView):
         leads = Lead.objects.filter(tenant=request.user.tenant).filter(q_filter)
         if request.user.role == CustomUser.Role.AGENT:
             leads = leads.filter(owner=request.user)
-
         leads = leads.order_by("-created_at")[:50]
-        return Response(LeadSerializer(leads, many=True).data)
+        return Response(LeadSerializer(leads, many=True, context={"request": request}).data)
 
 
 class LeadUploadView(APIView):

@@ -480,17 +480,23 @@ class NumberSearchView(APIView):
         return Response({"results": results})
 
 
-
 class NumberViewSet(TenantModelViewSet):
     serializer_class = PhoneNumberSerializer
     queryset = PhoneNumber.objects.all().order_by("-purchased_at")
-    agent_owner_field = None
+    # Scoped so an AGENT's GET /api/telephony/numbers/ only returns numbers
+    # assigned to them — previously None, which per TenantModelViewSet's own
+    # docstring meant AGENT fell back to full-tenant visibility, exposing
+    # every teammate's number (and Telnyx order IDs) to any agent who hit
+    # the endpoint directly rather than going through ProfilePage's
+    # client-side filter. ADMIN visibility (full tenant list) is unaffected
+    # — this field only applies to the AGENT branch in
+    # TenantModelViewSet.get_queryset().
+    agent_owner_field = "assigned_user"
 
     def get_permissions(self):
         if self.request.method in ("POST", "PUT", "PATCH", "DELETE"):
             return [IsAuthenticated(), IsTenantAdmin()]
         return [IsAuthenticated(), IsTenantMember()]
-    
     
 class NumberPurchaseView(APIView):
     permission_classes = [IsAuthenticated, IsTenantAdmin]

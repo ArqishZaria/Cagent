@@ -15,21 +15,9 @@ from wallet.serializers import (
     PricingRateSerializer, TenantWalletSerializer, WalletTopupSerializer,
     WalletTransactionSerializer,
 )
-from wallet.services import calculate_topup_breakdown, confirm_topup_paid, get_gateway, start_topup
-
+from wallet.services import FxRateUnavailable, calculate_topup_breakdown, confirm_topup_paid, get_gateway, start_topup
 MIN_TOPUP_USD = Decimal("2.00")
 
-
-class WalletSummaryView(APIView):
-    """GET /api/wallet/ — balance + low-balance flag for the sidebar badge."""
-
-    permission_classes = [IsAuthenticated, IsTenantMember]
-
-    def get(self, request):
-        wallet, _ = TenantWallet.objects.get_or_create(tenant=request.user.tenant)
-        data = TenantWalletSerializer(wallet).data
-        data["is_low"] = wallet.balance_usd <= wallet.low_balance_threshold_usd
-        return Response(data)
 
 
 class TopupQuoteView(APIView):
@@ -45,7 +33,11 @@ class TopupQuoteView(APIView):
         if amount < MIN_TOPUP_USD:
             return Response({"detail": f"Minimum top-up is ${MIN_TOPUP_USD}."}, status=400)
 
-        breakdown = calculate_topup_breakdown(amount)
+        try:
+            breakdown = calculate_topup_breakdown(amount)
+        except FxRateUnavailable as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
         return Response({
             "usd_amount": str(amount),
             "fx_rate": str(breakdown["fx_rate"]),
@@ -55,7 +47,6 @@ class TopupQuoteView(APIView):
             "platform_fee_usd": str(breakdown["platform_fee_usd"]),
             "net_credited_usd": str(breakdown["net_credited_usd"]),
         })
-
 
 class TopupCreateView(APIView):
     """POST /api/wallet/topups/  Body: {"amount_usd": "25.00"} — creates the QR."""
@@ -70,9 +61,12 @@ class TopupCreateView(APIView):
         if amount < MIN_TOPUP_USD:
             return Response({"detail": f"Minimum top-up is ${MIN_TOPUP_USD}."}, status=400)
 
-        topup = start_topup(request.user.tenant, request.user, amount)
-        return Response(WalletTopupSerializer(topup).data, status=status.HTTP_201_CREATED)
+        try:
+            topup = start_topup(request.user.tenant, request.user, amount)
+        except FxRateUnavailable as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
+        return Response(WalletTopupSerializer(topup).data, status=status.HTTP_201_CREATED)
 
 class TopupStatusView(APIView):
     """GET /api/wallet/topups/<id>/ — polled by the frontend while the QR is on screen."""
@@ -181,7 +175,7 @@ class WalletSummaryView(APIView):
             data["platform_fee_amount_usd"] = None
         return Response(data)
     
-    
+        
 class TransactionListView(APIView):
     permission_classes = [IsAuthenticated, IsTenantMember]
 

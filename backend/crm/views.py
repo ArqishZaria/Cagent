@@ -65,8 +65,7 @@ class LeadViewSet(TenantModelViewSet):
         if not lead.contacted_at:
             lead.contacted_at = timezone.now()
             lead.save(update_fields=["contacted_at"])
-        return Response(LeadSerializer(lead).data)
-
+        return Response(self.get_serializer(lead).data)
 
 class InteractionViewSet(TenantModelViewSet):
     serializer_class = InteractionSerializer

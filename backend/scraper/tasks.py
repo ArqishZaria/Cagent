@@ -102,9 +102,15 @@ def run_lead_scrape(self, scrape_task_id):
             "status", "existing_count", "master_pulled_count", "freshly_scraped_count",
         ])
 
-        total_returned = existing_count + len(master_pulled) + created
-        bill_lead_search(tenant, scrape_task, total_returned)
-
+        # Billed only on leads this search actually ADDED (pulled from the
+        # shared pool or freshly scraped) — matching the pricing page's
+        # promise that "a zero-result search costs nothing." Leads already
+        # sitting in the tenant's own DB (existing_count) don't count
+        # toward the bill: the search didn't do any new work to surface
+        # them, so charging for them would bill a no-op search whenever it
+        # happens to overlap with leads the tenant already had.
+        newly_added = len(master_pulled) + created
+        bill_lead_search(tenant, scrape_task, newly_added)
         logger.info(
             "ScrapeTask %s completed: %d existing, %d from master, %d freshly scraped (quota %d)",
             scrape_task_id, existing_count, len(master_pulled), created, LEAD_QUOTA,

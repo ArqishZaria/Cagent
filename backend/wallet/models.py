@@ -68,6 +68,11 @@ class PricingRate(models.Model):
         try:
             return cls.objects.get(key=key, is_active=True).cost_usd
         except cls.DoesNotExist:
+            import logging
+            logging.getLogger(__name__).error(
+                "No active PricingRate configured for '%s' — billing cannot proceed until "
+                "this is added via the admin panel or a data migration.", key,
+            )
             raise ValueError(f"No active PricingRate configured for '{key}' — set it in the admin panel first.")
 
 
@@ -110,11 +115,6 @@ class WalletTopup(models.Model):
 
     def __str__(self):
         return f"{self.tenant.company_name} — ${self.usd_amount_requested} ({self.status})"
-
-    def platform_fee_for(self, amount: Decimal) -> Decimal:
-        if amount < Decimal("10.00"):
-            return Decimal("2.00")
-        return (amount * Decimal("0.20")).quantize(Decimal("0.01"))
 
 
 class ManualCredit(models.Model):

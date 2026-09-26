@@ -52,12 +52,30 @@ def get_gateway():
 # --- FX + fee math ---------------------------------------------------------------------
 
 
-def get_usd_to_pkr_rate() -> Decimal:
-    resp = requests.get(settings.FX_RATE_API_URL, timeout=10)
-    resp.raise_for_status()
-    rate = resp.json()["rates"]["PKR"]
-    return Decimal(str(rate))
+class FxRateUnavailable(Exception):
+    """Raised when the exchange-rate API can't be reached or its response
+    doesn't have the shape we expect — lets callers (TopupQuoteView,
+    TopupCreateView) return a clean 503 instead of a raw 500 traceback."""
 
+
+def get_usd_to_pkr_rate() -> Decimal:
+    try:
+        resp = requests.get(settings.FX_RATE_API_URL, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        rate = data["rates"]["PKR"]
+    except requests.exceptions.RequestException as exc:
+        logger.exception("FX rate API request failed")
+        raise FxRateUnavailable("Couldn't reach the exchange rate service.") from exc
+    except (KeyError, TypeError, ValueError) as exc:
+        logger.exception("FX rate API returned an unexpected response shape")
+        raise FxRateUnavailable("Exchange rate service returned an unexpected response.") from exc
+
+    try:
+        return Decimal(str(rate))
+    except Exception as exc:
+        logger.exception("FX rate API returned a non-numeric PKR rate: %r", rate)
+        raise FxRateUnavailable("Exchange rate service returned an invalid rate.") from exc
 
 def calculate_platform_fee(usd_amount: Decimal) -> Decimal:
     """Flat $2 under $10, else 20% — this is OUR fee, deducted from the wallet credit."""
@@ -119,43 +137,58 @@ def start_topup(tenant, requested_by, usd_amount: Decimal) -> WalletTopup:
 def confirm_topup_paid(topup: WalletTopup) -> WalletTopup:
     """
     Idempotent on purpose — a webhook can legitimately fire more than once.
+
+    Locks the WalletTopup row for the duration of the status check + write,
+    so two near-simultaneous webhook deliveries for the same top-up can
+    never both pass the "not yet PAID" check and double-credit the wallet.
+    The second caller blocks on select_for_update() until the first
+    transaction commits, then re-reads status as PAID and returns early.
+
+    Everything inside this function must stay inside the atomic block —
+    including the re-read of `topup` — or the lock is pointless.
     """
-    if topup.status == WalletTopup.Status.PAID:
-        return topup
+    with transaction.atomic():
+        topup = WalletTopup.objects.select_for_update().get(pk=topup.pk)
 
-    platform_fee = calculate_platform_fee(topup.usd_amount_requested)
-    net_credited = topup.usd_amount_requested - platform_fee
+        if topup.status == WalletTopup.Status.PAID:
+            return topup
 
-    topup.status = WalletTopup.Status.PAID
-    topup.platform_fee_usd = platform_fee
-    topup.net_credited_usd = net_credited
-    topup.paid_at = timezone.now()
-    topup.invoice_number = f"INV-{topup.tenant_id}-{uuid.uuid4().hex[:8].upper()}"
-    topup.save(update_fields=[
-        "status", "platform_fee_usd", "net_credited_usd", "paid_at", "invoice_number",
-    ])
+        platform_fee = calculate_platform_fee(topup.usd_amount_requested)
+        net_credited = topup.usd_amount_requested - platform_fee
 
-    WalletTransaction.apply(
-        tenant=topup.tenant,
-        type=WalletTransaction.Type.TOPUP,
-        amount_usd=net_credited,
-        description=f"Wallet top-up ({topup.invoice_number}) — ${topup.usd_amount_requested} gross, "
-                     f"${platform_fee} platform fee",
-        related_topup=topup,
-    )
+        topup.status = WalletTopup.Status.PAID
+        topup.platform_fee_usd = platform_fee
+        topup.net_credited_usd = net_credited
+        topup.paid_at = timezone.now()
+        topup.invoice_number = f"INV-{topup.tenant_id}-{uuid.uuid4().hex[:8].upper()}"
+        topup.save(update_fields=[
+            "status", "platform_fee_usd", "net_credited_usd", "paid_at", "invoice_number",
+        ])
 
-    # If this tenant was locked out on an unpaid recurring platform fee,
-    # this top-up may now cover it — try immediately rather than waiting
-    # for tomorrow's daily sweep (wallet.tasks.charge_platform_fees).
-    try_charge_platform_fee(topup.tenant)
+        WalletTransaction.apply(
+            tenant=topup.tenant,
+            type=WalletTransaction.Type.TOPUP,
+            amount_usd=net_credited,
+            description=f"Wallet top-up ({topup.invoice_number}) — ${topup.usd_amount_requested} gross, "
+                         f"${platform_fee} platform fee",
+            related_topup=topup,
+        )
 
+        # If this tenant was locked out on an unpaid recurring platform fee,
+        # this top-up may now cover it — try immediately rather than waiting
+        # for tomorrow's daily sweep (wallet.tasks.charge_platform_fees).
+        try_charge_platform_fee(topup.tenant)
+
+    # PDF generation and email notification are deliberately OUTSIDE the
+    # atomic block: they're slow, external-facing side effects (disk I/O,
+    # SMTP) that don't need to hold the row lock, and if either one throws,
+    # you don't want to roll back a payment that already succeeded.
     from wallet.pdf import generate_topup_invoice_pdf
     from wallet.notifications import notify_topup_success
     generate_topup_invoice_pdf(topup)
     notify_topup_success(topup)
 
     return topup
-
 
 # --- Usage billing -----------------------------------------------------------------------
 
@@ -226,17 +259,11 @@ def try_charge_platform_fee(tenant) -> bool:
         locked_tenant.save(update_fields=["next_platform_fee_charge_at", "subscription_status"])
         return True
 
-
 def bill_usage(tenant, *, type, cost_usd: Decimal, description="", **refs) -> WalletTransaction:
-    txn = WalletTransaction.apply(
+    
+    return WalletTransaction.apply(
         tenant=tenant, type=type, amount_usd=-cost_usd, description=description, **refs,
     )
-    wallet = TenantWallet.objects.get(tenant=tenant)
-    if wallet.low_balance_notified_at and wallet.balance_usd <= wallet.low_balance_threshold_usd:
-        from wallet.notifications import notify_low_balance
-        notify_low_balance(wallet)
-    return txn
-
 
 def count_sms_segments(text: str) -> int:
     """
