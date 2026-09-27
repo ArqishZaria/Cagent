@@ -95,6 +95,10 @@ class InteractionViewSet(TenantModelViewSet):
                 contacted_at=timezone.now()
             )
 
-        if instance.type == instance.Type.CALL and instance.duration_seconds:
-            from wallet.services import bill_call
-            bill_call(instance)
+        # NOTE: CALL-type Interactions are never billed here anymore. Every
+        # call (inbound or outbound) is created AND billed exclusively from
+        # Telnyx's own signed webhooks (telephony.views.VoiceWebhookView —
+        # call.initiated creates the row, call.cost bills it using Telnyx's
+        # own billed_duration_secs). A client can still log a CALL-type
+        # Interaction here for manual note-keeping, but it can no longer
+        # trigger a wallet charge no matter what duration_seconds it sends.

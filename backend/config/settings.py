@@ -55,16 +55,17 @@ INSTALLED_APPS = [
     # Third-party
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist", 
     "corsheaders",
     "django_celery_beat",
     # Local apps
-    "core",  # Tenant, CustomUser, Lead, Interaction, PhoneNumber, SupportMessage, ScrapeTask
-    "users",  # Employee management (ADMIN creates AGENT accounts)
-    "telephony",  # Telnyx WebRTC, voice, and SMS webhooks
-    "scraper",  # $0 Agentic Lead Generation
-    "crm",  # Lead + Interaction API (list/detail/create for the CRM UI)
-    "support",  # Boss-only support chat
-    "wallet",  # prepaid wallet, Raast top-ups, usage billing (replaces the old "billing" app)
+    "core",
+    "users",
+    "telephony",
+    "scraper",
+    "crm",
+    "support",
+    "wallet",
 ]
 
 MIDDLEWARE = [

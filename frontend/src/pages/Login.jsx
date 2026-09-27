@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const submit = async (e) => {
+    const submit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -22,12 +22,16 @@ export default function LoginPage() {
       localStorage.setItem("last_active", String(Date.now()));
       navigate("/app");
     } catch (err) {
-      setError("That username or password isn't right.");
+      if (err.response?.status === 429) {
+        setError(err.response?.data?.detail || "Too many attempts — please wait a moment and try again.");
+      } else {
+        setError("That username or password isn't right.");
+      }
     } finally {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="mkt-page min-h-screen flex items-center justify-center px-6 relative overflow-hidden">
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-mkt-green/[0.06] blur-[120px] pointer-events-none" />

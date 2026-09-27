@@ -50,20 +50,14 @@ export default function useTelnyxCall() {
   const [callError, setCallError] = useState("");
 
   const logCall = (call, meta, durationSeconds) => {
-    if (!meta?.leadId) return; // no lead context (e.g. inbound) — server already logged it
-    api
-      .post("/api/interactions/", {
-        lead: meta.leadId,
-        type: "CALL",
-        direction: call?.direction === "inbound" ? "INBOUND" : "OUTBOUND",
-        duration_seconds: Math.max(0, Math.round(durationSeconds || 0)),
-        phone_number: meta.fromNumberId || null,
-      })
-      .catch(() => {
-        /* best-effort — a missed log entry shouldn't interrupt the call flow */
-      });
+    // Outbound calls are now created and billed entirely server-side, from
+    // Telnyx's own call.initiated/call.cost webhooks (see
+    // telephony.views.VoiceWebhookView) — Telnyx's own billed duration is
+    // the only number that ever reaches the wallet ledger. This function
+    // intentionally does nothing anymore; kept as a no-op (rather than
+    // deleting it and its two call sites) so nothing else in this file
+    // needs to change.
   };
-
   useEffect(() => {
     if (!incomingCall) return;
     const isEnded = ENDED_STATES.includes(incomingCall.state);

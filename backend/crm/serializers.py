@@ -47,6 +47,8 @@ class LeadSerializer(serializers.ModelSerializer):
         return last or obj.contacted_at
 
 
+# backend/crm/serializers.py
+
 class InteractionSerializer(serializers.ModelSerializer):
     lead_name = serializers.SerializerMethodField()
     phone_number_display = serializers.SerializerMethodField()
@@ -56,19 +58,13 @@ class InteractionSerializer(serializers.ModelSerializer):
         fields = (
             "id", "lead", "user", "type", "direction",
             "duration_seconds", "notes", "message_body", "missed", "timestamp",
+            "phone_number",              # <-- added: was silently dropped on write
             "lead_name", "phone_number_display",
         )
         read_only_fields = ("id", "missed", "timestamp", "lead_name", "phone_number_display")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Same reasoning as LeadSerializer.owner above: `lead` and `user`
-        # must be restricted to the requesting user's own tenant, or a
-        # client can attach a fabricated interaction to another tenant's
-        # lead (it would still carry tenant=<attacker's tenant> on the
-        # Interaction row itself, but would show up via lead.interactions
-        # on the OTHER tenant's side — see crm.serializers.LeadSerializer.
-        # get_last_message_at's cross-FK annotation in crm.views.LeadViewSet).
         request = self.context.get("request")
         tenant_id = getattr(request.user, "tenant_id", None) if request else None
         if "lead" in self.fields:
@@ -78,6 +74,11 @@ class InteractionSerializer(serializers.ModelSerializer):
         if "user" in self.fields:
             self.fields["user"].queryset = (
                 CustomUser.objects.filter(tenant_id=tenant_id) if tenant_id else CustomUser.objects.none()
+            )
+        if "phone_number" in self.fields:                                    # <-- added
+            from core.models import PhoneNumber
+            self.fields["phone_number"].queryset = (
+                PhoneNumber.objects.filter(tenant_id=tenant_id) if tenant_id else PhoneNumber.objects.none()
             )
 
     def get_lead_name(self, obj):

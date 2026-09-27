@@ -184,15 +184,23 @@ class VoiceWebhookView(APIView):
                 self._handle_call_initiated(payload, call_control_id)
             elif event_type == "call.hangup":
                 self._handle_call_hangup(payload, call_control_id)
+            elif event_type == "call.cost":
+                self._handle_call_cost(payload, call_control_id)
         except Exception:
             logger.exception("Error handling voice webhook event_type=%s", event_type)
 
         return Response(status=status.HTTP_200_OK)
 
     def _handle_call_initiated(self, payload, call_control_id):
-        if _field(payload, "direction") != "incoming":
-            return
+        direction = _field(payload, "direction")
+        if direction == "incoming":
+            self._handle_inbound_call_initiated(payload, call_control_id)
+        elif direction == "outgoing":
+            self._handle_outbound_call_initiated(payload, call_control_id)
+        # Anything else: ignore, same as the old behavior of only acting on "incoming".
 
+    def _handle_inbound_call_initiated(self, payload, call_control_id):
+        # --- UNCHANGED from the existing _handle_call_initiated body ---
         to_number = normalize_to_e164(_field(payload, "to"))
         from_number = normalize_to_e164(_from_field(payload))
 
@@ -212,16 +220,8 @@ class VoiceWebhookView(APIView):
             phone_number=from_number,
             defaults={"status": Lead.Status.NEW, "owner": assigned_user},
         )
-        # An inbound call is itself contact — surface this lead directly in
-        # the CRM/Dialer chat list immediately, regardless of how the
-        # platform-fee/balance checks below resolve (even a missed/declined
-        # call should still show up as a chat entry so the agent can see
-        # it happened).
         _mark_contacted_if_needed(lead)
 
-        # Platform-fee gate — a tenant locked out for an overdue platform
-        # fee can't receive calls either, same reasoning as the balance
-        # gate right below it.
         try:
             require_platform_fee_current(tenant)
         except PlatformFeeOverdue:
@@ -230,24 +230,14 @@ class VoiceWebhookView(APIView):
                 to_number, tenant.company_name,
             )
             Interaction.objects.create(
-                tenant=tenant,
-                user=assigned_user,
-                lead=lead,
-                type=Interaction.Type.CALL,
-                direction=Interaction.Direction.INBOUND,
-                phone_number=phone_number,
-                duration_seconds=0,
-                missed=True,
+                tenant=tenant, user=assigned_user, lead=lead,
+                type=Interaction.Type.CALL, direction=Interaction.Direction.INBOUND,
+                phone_number=phone_number, duration_seconds=0, missed=True,
                 notes="Auto-declined — platform fee overdue.",
             )
             self._decline_call(call_control_id)
             return
 
-        # Balance gate — an inbound call still costs the inbound per-minute
-        # rate at hangup (bill_call rounds up to at least 1 minute), so a
-        # tenant that can't afford that minute can't afford to receive the
-        # call either. Auto-decline instead of routing, and log it as a
-        # missed call so it's visible in Call Logs.
         per_minute = PricingRate.get_cost(PricingRate.Key.CALL_INBOUND_PER_MINUTE)
         try:
             require_balance(tenant, per_minute)
@@ -257,25 +247,17 @@ class VoiceWebhookView(APIView):
                 to_number, tenant.company_name,
             )
             Interaction.objects.create(
-                tenant=tenant,
-                user=assigned_user,
-                lead=lead,
-                type=Interaction.Type.CALL,
-                direction=Interaction.Direction.INBOUND,
-                phone_number=phone_number,
-                duration_seconds=0,
-                missed=True,
+                tenant=tenant, user=assigned_user, lead=lead,
+                type=Interaction.Type.CALL, direction=Interaction.Direction.INBOUND,
+                phone_number=phone_number, duration_seconds=0, missed=True,
                 notes="Auto-declined — insufficient wallet balance.",
             )
             self._decline_call(call_control_id)
             return
 
         interaction = Interaction.objects.create(
-            tenant=tenant,
-            user=assigned_user,
-            lead=lead,
-            type=Interaction.Type.CALL,
-            direction=Interaction.Direction.INBOUND,
+            tenant=tenant, user=assigned_user, lead=lead,
+            type=Interaction.Type.CALL, direction=Interaction.Direction.INBOUND,
             phone_number=phone_number,
         )
         cache.set(f"telnyx:call_interaction:{call_control_id}", interaction.id, timeout=3600)
@@ -284,6 +266,52 @@ class VoiceWebhookView(APIView):
             self._route_to_agent(call_control_id, assigned_user)
         else:
             logger.info("Number %s has no assigned agent; call left unrouted.", to_number)
+
+    def _handle_outbound_call_initiated(self, payload, call_control_id):
+        """
+        Fires for every call placed from our own WebRTC dialer
+        (direction="outgoing", confirmed via live webhook inspection on
+        2026-09-27). This is now the ONLY place an outbound Interaction row
+        is created — the client no longer POSTs one after hangup (see
+        useTelnyxCall.js). Attribution mirrors the inbound handler exactly,
+        with from/to swapped: our own Telnyx number tells us the tenant and
+        the assigned agent; the dialed number is looked up (or created, same
+        get_or_create fallback the inbound side already uses) as a Lead.
+        """
+        cache_key = f"telnyx:call_interaction:{call_control_id}"
+        if cache.get(cache_key):
+            return  # duplicate call.initiated delivery — already handled
+
+        from_number = normalize_to_e164(_from_field(payload))   # our own Telnyx number
+        to_number = normalize_to_e164(_field(payload, "to"))    # the lead's number
+
+        try:
+            phone_number = PhoneNumber.objects.select_related("tenant", "assigned_user").get(
+                phone_number=from_number, is_active=True
+            )
+        except PhoneNumber.DoesNotExist:
+            logger.warning("Outbound call from unrecognized number %s — can't attribute for billing.", from_number)
+            return
+
+        tenant = phone_number.tenant
+        assigned_user = phone_number.assigned_user
+
+        lead, _created = Lead.objects.get_or_create(
+            tenant=tenant,
+            phone_number=to_number,
+            defaults={"status": Lead.Status.NEW, "owner": assigned_user},
+        )
+        _mark_contacted_if_needed(lead)
+
+        interaction = Interaction.objects.create(
+            tenant=tenant,
+            user=assigned_user,
+            lead=lead,
+            type=Interaction.Type.CALL,
+            direction=Interaction.Direction.OUTBOUND,
+            phone_number=phone_number,
+        )
+        cache.set(cache_key, interaction.id, timeout=3600)
 
     def _route_to_agent(self, call_control_id, assigned_user):
         sip_username = get_agent_sip_username(assigned_user)
@@ -297,22 +325,37 @@ class VoiceWebhookView(APIView):
         call.hangup()
 
     def _handle_call_hangup(self, payload, call_control_id):
+        """
+        Confirmed (live webhook inspection, 2026-09-27): Telnyx's
+        call.hangup payload for this account carries NO duration field at
+        all — not even a zero — on either a cancelled or a real 5.5-minute
+        answered call. Billing therefore happens entirely in
+        _handle_call_cost below, using call.cost's own billed_duration_secs.
+        Left as an explicit no-op branch (not removed) in case hangup_cause
+        is needed for something later — but it does nothing today.
+        """
+        return
+
+    def _handle_call_cost(self, payload, call_control_id):
+        """
+        call.cost is Telnyx's own final, authoritative billing event for a
+        call leg — confirmed to carry billed_duration_secs at the top level
+        for both directions, arriving ~200ms after call.hangup. This is now
+        the ONLY code path in the entire system that ever calls bill_call().
+        """
         cache_key = f"telnyx:call_interaction:{call_control_id}"
         interaction_id = cache.get(cache_key)
         if not interaction_id:
-            return
+            return  # already processed, or call.initiated was never handled for this leg
 
-        duration = _field(payload, "call_duration_secs") or 0
-        Interaction.objects.filter(id=interaction_id).update(duration_seconds=duration)
         cache.delete(cache_key)
 
-        # Bill the wallet for this call now that we know its real duration.
-        # bill_call() is idempotent (checks for an existing WalletTransaction
-        # tied to this interaction), so a retried/duplicate webhook can't
-        # double-charge.
-        interaction = Interaction.objects.select_related("tenant", "phone_number").get(id=interaction_id)
-        bill_call(interaction)
+        duration = _field(payload, "billed_duration_secs") or 0
+        Interaction.objects.filter(id=interaction_id).update(duration_seconds=duration)
 
+        if duration:
+            interaction = Interaction.objects.select_related("tenant", "phone_number").get(id=interaction_id)
+            bill_call(interaction)
 
 class SMSSendView(APIView):
     """
