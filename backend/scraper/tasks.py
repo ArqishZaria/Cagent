@@ -130,16 +130,18 @@ def run_lead_scrape(self, scrape_task_id):
 @shared_task(bind=True)
 def process_lead_upload(self, upload_task_id, file_path):
     """
-    Bulk upload, now with verification + Master DB routing:
-      1. Parse the file.
-      2. Rows with no email/phone but a website get an enrichment scrape
-         (unchanged from before).
-      3. Rows that STILL have no contact info are rejected outright.
-      4. Rows WITH contact info but no website get a lightweight web-presence
-         check (verify_lead_has_web_presence) — no web presence = rejected,
-         with a reason recorded in failed_rows for the tenant to review.
-      5. Everything that passes is dedup-merged into the tenant's Lead list
-         AND upserted into the shared Master pool.
+    Bulk upload — simplified: every row with an email or phone number is
+    added straight to the tenant's own Lead list via find_or_create_lead.
+    No scraping, no verification, and no Master DB promotion happens here
+    — uploading is free and instant. Rows with neither an email nor a
+    phone number are rejected outright (nothing to dedupe/contact on).
+
+    Promoting a tenant's uploaded leads into the shared Master DB is a
+    separate, manual step: select the leads in Django admin and run the
+    "Verify web presence & queue for Master DB" action (see
+    verify_and_promote_leads below and core.admin.LeadAdmin) — that's the
+    only place this scrape now runs, and it's never billed either; it's
+    Arqish personally deciding what's worth reusing across clients.
 
     The uploaded temp file at file_path is always removed before this task
     exits, on every exit path — including the early return below when the
@@ -165,30 +167,10 @@ def process_lead_upload(self, upload_task_id, file_path):
                 website = (row.get("website") or "").strip()
                 label = row.get("company") or f"{row.get('first_name', '')} {row.get('last_name', '')}".strip() or f"row {i}"
 
-                has_contact = bool(email or phone)
-
-                if not has_contact and website:
-                    try:
-                        scraped_text = crawl_urls([website])
-                        enriched = extract_leads_with_gemini(scraped_text)
-                        if enriched and isinstance(enriched[0], dict):
-                            email = email or (enriched[0].get("email") or "").strip()
-                            phone = phone or (enriched[0].get("phone_number") or "").strip()
-                            has_contact = bool(email or phone)
-                    except Exception:
-                        logger.exception("Enrichment scrape failed for %s", website)
-
-                if not has_contact:
+                if not email and not phone:
                     errors += 1
                     failed_rows.append({"row": i, "label": label, "reason": "No email or phone number found."})
                     continue
-
-                if not website:
-                    found, _text = verify_lead_has_web_presence(row)
-                    if not found:
-                        errors += 1
-                        failed_rows.append({"row": i, "label": label, "reason": "No web presence found — couldn't verify."})
-                        continue
 
                 lead_defaults = {
                     "first_name": row.get("first_name", ""),
@@ -213,12 +195,6 @@ def process_lead_upload(self, upload_task_id, file_path):
                     created += 1
                 else:
                     updated += 1
-
-                upsert_master_lead(
-                    {**lead_defaults, "email": email, "phone_number": phone},
-                    query=f"{row.get('company', '')} {row.get('city', '')} {row.get('state', '')}",
-                    source_tenant=upload_task.tenant,
-                )
 
             upload_task.status = LeadUploadTask.Status.COMPLETED
             upload_task.created_count = created
@@ -248,3 +224,54 @@ def process_lead_upload(self, upload_task_id, file_path):
                 os.remove(file_path)
         except OSError:
             logger.exception("Couldn't remove temp upload file %s", file_path)
+            
+@shared_task(bind=True)
+def verify_and_promote_leads(self, lead_ids):
+    """
+    Manually triggered from Django admin (see core.admin.LeadAdmin's
+    "Verify web presence & queue for Master DB" action) — never automatic,
+    never billed. Arqish selects leads he's personally vetted are worth
+    reusing across clients; this runs the same web-presence check the old
+    automatic upload flow used (verify_lead_has_web_presence), and
+    anything that still has a real web presence gets upserted into the
+    shared MasterLead pool. Leads that fail the check are simply left
+    alone — not deleted, not flagged, just not promoted.
+    """
+    leads = Lead.objects.filter(id__in=lead_ids).select_related("tenant")
+    promoted = skipped = 0
+
+    for lead in leads:
+        row = {
+            "first_name": lead.first_name,
+            "last_name": lead.last_name,
+            "job_title": lead.job_title,
+            "company": lead.company,
+            "phone_number": lead.phone_number,
+            "email": lead.email,
+            "website": lead.website,
+            "address": lead.address,
+            "city": lead.city,
+            "state": lead.state,
+        }
+        try:
+            found, _text = verify_lead_has_web_presence(row)
+        except Exception:
+            logger.exception("Master DB verification failed for lead %s — leaving unpromoted.", lead.id)
+            skipped += 1
+            continue
+
+        if found:
+            upsert_master_lead(
+                row,
+                query=f"{lead.company} {lead.city} {lead.state}".strip(),
+                source_tenant=lead.tenant,
+            )
+            promoted += 1
+        else:
+            skipped += 1
+
+    logger.info(
+        "verify_and_promote_leads: %d promoted, %d skipped (no web presence) out of %d selected",
+        promoted, skipped, len(lead_ids),
+    )
+    return {"promoted": promoted, "skipped": skipped}

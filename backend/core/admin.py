@@ -169,11 +169,23 @@ class LeadAdmin(admin.ModelAdmin):
     list_filter = ("status", "do_not_contact", "tenant")
     search_fields = ("first_name", "last_name", "company", "phone_number", "email")
     readonly_fields = ("created_at", "updated_at")
+    actions = ["verify_and_promote_to_master"]
 
     @admin.display(description="Name")
     def full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or "—"
 
+    @admin.action(description="Verify web presence & queue for Master DB")
+    def verify_and_promote_to_master(self, request, queryset):
+        from scraper.tasks import verify_and_promote_leads
+        lead_ids = list(queryset.values_list("id", flat=True))
+        verify_and_promote_leads.delay(lead_ids)
+        self.message_user(
+            request,
+            f"Queued {len(lead_ids)} lead(s) for web-presence verification — "
+            f"check the Master DB list shortly to see which ones were promoted.",
+            messages.INFO,
+        )
 
 # ------------------------------------------------------------------------------------
 # Interactions (call / SMS logs)
