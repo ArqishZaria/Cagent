@@ -32,6 +32,7 @@ from wallet.services import (
     PlatformFeeOverdue,
     bill_call,
     bill_sms,
+    calculate_number_purchase_cost,
     count_sms_segments,
     require_balance,
     require_platform_fee_current,
@@ -560,14 +561,10 @@ class NumberPurchaseView(APIView):
                 status=status.HTTP_402_PAYMENT_REQUIRED,
             )
 
-        first_month_cost = (
-            PricingRate.get_cost(PricingRate.Key.NUMBER_MONTHLY_RENTAL)
-            + PricingRate.get_cost(PricingRate.Key.NUMBER_SMS_CAPABILITY_FEE)
-        )
+        prorated_cost = calculate_number_purchase_cost()
         try:
-            require_balance(request.user.tenant, first_month_cost)
-        except InsufficientBalance as exc:
-            return Response(
+            require_balance(request.user.tenant, prorated_cost)
+        except InsufficientBalance as exc:            return Response(
                 {"detail": f"Insufficient wallet balance to buy a number (need ${exc.required}, have ${exc.available}).",
                  "code": "insufficient_balance"},
                 status=status.HTTP_402_PAYMENT_REQUIRED,

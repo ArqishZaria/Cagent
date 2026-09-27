@@ -1,3 +1,4 @@
+from django.db import IntegrityError, transaction
 from django.db.models import F, Max, Q
 from django.utils import timezone
 from rest_framework.decorators import action
@@ -55,8 +56,22 @@ class LeadViewSet(TenantModelViewSet):
             raise ValidationError({"email": "A lead with this email already exists."})
         if phone and Lead.objects.filter(tenant=tenant, phone_number=phone).exists():
             raise ValidationError({"phone_number": "A lead with this phone number already exists."})
-        super().perform_create(serializer)
 
+        # The .exists() checks above are a fast pre-check, not a lock — two
+        # near-simultaneous requests can both pass them, then both try to
+        # insert, hitting Lead's DB-level UniqueConstraint
+        # (unique_tenant_email_when_present / unique_tenant_phone_when_present)
+        # as a raw, unhandled IntegrityError -> 500. Catching it here turns
+        # the race into the same clean 400 a normal duplicate already gets.
+        try:
+            with transaction.atomic():
+                super().perform_create(serializer)
+        except IntegrityError:
+            raise ValidationError({
+                "detail": "A lead with this email or phone number was just created — please refresh and try again.",
+            })
+            
+            
     @action(detail=True, methods=["post"])
     def contact(self, request, pk=None):
         lead = self.get_object()

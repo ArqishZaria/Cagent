@@ -4,7 +4,7 @@ the codebase (telephony, scraper, crm) imports from this module rather than
 touching WalletTransaction or PricingRate directly — one place to get the
 math right.
 """
-
+import calendar
 import logging
 import math
 import re
@@ -78,11 +78,14 @@ def get_usd_to_pkr_rate() -> Decimal:
         raise FxRateUnavailable("Exchange rate service returned an invalid rate.") from exc
 
 def calculate_platform_fee(usd_amount: Decimal) -> Decimal:
-    """Flat $2 under $10, else 20% — this is OUR fee, deducted from the wallet credit."""
-    if usd_amount < Decimal("10.00"):
-        return Decimal("2.00")
-    return (usd_amount * Decimal("0.20")).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
-
+    """
+    No top-up fee anymore — every dollar requested is credited to the
+    wallet in full. Kept as a function (always returning $0.00) rather
+    than deleted, so every call site that still reads platform_fee_usd /
+    net_credited_usd (start_topup, confirm_topup_paid, TopupQuoteView,
+    wallet_invoices PDF) keeps working with zero other changes.
+    """
+    return Decimal("0.00")
 
 def calculate_topup_breakdown(usd_amount: Decimal) -> dict:
     """
@@ -369,21 +372,50 @@ def bill_lead_search(tenant, scrape_task, total_leads_returned: int):
             scrape_task.id,
         )
     
-def bill_number_purchase(phone_number):
+def calculate_number_purchase_cost() -> Decimal:
     """
-    Charges the first month's rental + SMS capability fee the instant a
-    number is purchased, and stamps last_billed_at so the monthly sweep
-    knows this month is already covered.
+    The PRORATED cost of purchasing a number today: full monthly rental +
+    SMS capability fee, scaled to the days remaining in the current
+    calendar month (day 1 of a 30-day month -> 30/30, full price; day 30
+    -> 1/30, one day's worth). Shared by the pre-purchase balance check
+    (telephony.views.NumberPurchaseView) and the actual charge below
+    (bill_number_purchase), so the same number is checked and charged —
+    a tenant can never pass the balance check and then fail the real bill.
     """
     rental_cost = PricingRate.get_cost(PricingRate.Key.NUMBER_MONTHLY_RENTAL)
     sms_fee = PricingRate.get_cost(PricingRate.Key.NUMBER_SMS_CAPABILITY_FEE)
+    full_month_cost = rental_cost + sms_fee
+
+    today = timezone.now().date()
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    days_remaining = days_in_month - today.day + 1
+    fraction = Decimal(days_remaining) / Decimal(days_in_month)
+
+    return (full_month_cost * fraction).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
+def bill_number_purchase(phone_number):
+    """
+    Charges a PRORATED first month's rental + SMS capability fee — only
+    for the days remaining in the calendar month from the purchase date —
+    then stamps last_billed_at to the 1st of that month so the monthly
+    sweep (wallet.tasks.charge_monthly_number_rentals) correctly charges
+    the FULL rate starting next month, without re-billing this partial one.
+    """
+    today = timezone.now().date()
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    days_remaining = days_in_month - today.day + 1
+    cost = calculate_number_purchase_cost()
 
     bill_usage(
         phone_number.tenant,
         type=WalletTransaction.Type.USAGE_NUMBER_RENTAL,
-        cost_usd=rental_cost + sms_fee,
-        description=f"Number purchase — first month rental — {phone_number.phone_number}",
+        cost_usd=cost,
+        description=(
+            f"Number purchase — prorated first month rental "
+            f"({days_remaining}/{days_in_month} days) — {phone_number.phone_number}"
+        ),
         related_phone_number=phone_number,
     )
-    phone_number.last_billed_at = timezone.now().date().replace(day=1)
+    phone_number.last_billed_at = today.replace(day=1)
     phone_number.save(update_fields=["last_billed_at"])

@@ -20,6 +20,13 @@ from support.serializers import SupportMessageSerializer
 # embedded chat but their messages will 403 — only the tenant's ADMIN can
 # actually use it, matching the spec as written.
 
+# Matches the frontend file picker's accept="image/*,.pdf" (SupportChatWidget.jsx) —
+# the accept attribute only filters the OS file dialog, so this needs enforcing
+# server-side too.
+ALLOWED_ATTACHMENT_CONTENT_TYPES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf",
+}
+MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB — plenty for a transfer screenshot/PDF
 
 class SupportHistoryView(APIView):
     """GET /api/support/history/ — full thread for the requester's tenant."""
@@ -50,8 +57,20 @@ class SupportSendView(APIView):
         if not text and not file_obj:
             return Response({"detail": "message or attachment is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        msg = SupportMessage.objects.create(
-            tenant=request.user.tenant,
+        if file_obj:
+            if file_obj.size > MAX_ATTACHMENT_SIZE_BYTES:
+                return Response(
+                    {"detail": "Attachment is too large — max 10 MB."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            content_type = file_obj.content_type or mimetypes.guess_type(file_obj.name)[0]
+            if content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
+                return Response(
+                    {"detail": "Unsupported file type — attach an image (JPEG/PNG/GIF/WEBP) or a PDF."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        msg = SupportMessage.objects.create(            
             sender=request.user,
             is_from_platform_owner=False,
             message=text,

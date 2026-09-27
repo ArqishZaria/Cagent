@@ -140,7 +140,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
     setSending(true);
     setError("");
     try {
-      await api.post("/api/telephony/sms/send/", {
+      const res = await api.post("/api/telephony/sms/send/", {
         lead_id: lead.id,
         from_number: fromNumber.phone_number,
         message: text,
@@ -148,7 +148,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
       scrollToBottomRef.current = true;
       setMessages((prev) => [
         ...prev,
-        { id: `local-${Date.now()}`, direction: "OUTBOUND", message_body: text, timestamp: new Date().toISOString() },
+        { id: res.data.id, direction: "OUTBOUND", message_body: text, timestamp: new Date().toISOString() },
       ]);
       setDraft("");
     } catch (err) {
