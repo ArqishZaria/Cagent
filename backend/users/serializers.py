@@ -27,19 +27,24 @@ class AgentCreateSerializer(serializers.ModelSerializer):
         fields = ("id", "username", "email", "first_name", "last_name", "password")
         read_only_fields = ("id",)
 
+    def validate_email(self, value):
+        value = (value or "").strip()
+        if value and CustomUser.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
     def create(self, validated_data):
         password = validated_data.pop("password")
         tenant = self.context["request"].user.tenant
 
         user = CustomUser(
             tenant=tenant,
-            role=CustomUser.Role.AGENT,  # hard-coded — this endpoint only ever creates agents
+            role=CustomUser.Role.AGENT,
             **validated_data,
         )
         user.set_password(password)
         user.save()
         return user
-
 
 class CurrentUserSerializer(serializers.ModelSerializer):
     """Used by /api/users/me/ — powers the Profile page and lets the

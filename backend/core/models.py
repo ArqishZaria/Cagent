@@ -67,6 +67,13 @@ class Invoice(models.Model):
         return f"{self.invoice_number} ({self.tenant.company_name})"
 
 
+from decimal import Decimal
+from core.phone_utils import normalize_to_e164
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.db.models.functions import Lower   # <-- added
+
+
 class CustomUser(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = "ADMIN", "Admin (Boss)"
@@ -77,9 +84,20 @@ class CustomUser(AbstractUser):
     )
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.AGENT)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                Lower("email"),
+                condition=~models.Q(email=""),
+                name="unique_user_email_ci",
+                violation_error_message="A user with this email already exists.",
+            ),
+        ]
+
     def __str__(self):
         return f"{self.username} ({self.role})"
-
+    
+    
 class PhoneNumber(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="phone_numbers")
     assigned_user = models.ForeignKey(
