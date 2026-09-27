@@ -20,7 +20,7 @@ const FAQS = [
       { q: "How does the Prospector find leads?", a: "Type in who you're looking for (industry, city, role). cagent checks your own list, then the shared verified pool, then searches the live web — filling up to 25 leads per search, in that order." },
       { q: "What does a search cost?", a: "A flat fee per search, charged only if it actually returns at least one lead — see Usage for the exact rate." },
       { q: "How do I bulk upload leads?", a: "On the Leads tab, use Bulk upload leads and pick a .csv or .xlsx file (download the template first). Rows need at least an email or phone number." },
-      { q: "Why did some uploaded rows get rejected?", a: "A row is rejected if it has no email/phone and no verifiable web presence — the reasons are shown after the upload finishes." },
+      { q: "Why did some uploaded rows get rejected?", a: "A row is rejected if it has neither an email nor a phone number — there's nothing to add it to your list by." },
       { q: "What makes a lead appear in the CRM & Dialer tab?", a: "Clicking Contact on a lead in the Leads List — or logging a call/text for it directly — is what moves it into the CRM & Dialer tab." },
     ],
   },

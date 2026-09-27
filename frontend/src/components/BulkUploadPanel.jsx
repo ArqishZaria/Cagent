@@ -19,13 +19,6 @@ function downloadTemplate() {
   URL.revokeObjectURL(url);
 }
 
-/**
- * BulkUploadPanel — upload a CSV/XLSX of leads. Every row goes through the
- * same dedup rule as the web scraper (same email or phone = same lead,
- * gets merged rather than duplicated), and rows missing contact info but
- * given a website get a quick scraper-verification pass before being
- * counted as unusable.
- */
 export default function BulkUploadPanel({ onComplete }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
