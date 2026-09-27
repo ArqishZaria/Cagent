@@ -197,28 +197,54 @@ class TransactionBreakdownView(APIView):
     def get(self, request):
         from django.db.models import Sum
         tenant = request.user.tenant
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        date_filtered = bool(date_from or date_to)
 
-        usage_qs = WalletTransaction.objects.filter(tenant=tenant, type__startswith="USAGE_")
-        if request.query_params.get("date_from"):
-            usage_qs = usage_qs.filter(created_at__date__gte=request.query_params["date_from"])
-        if request.query_params.get("date_to"):
-            usage_qs = usage_qs.filter(created_at__date__lte=request.query_params["date_to"])
-        usage_qs = usage_qs.values("type").annotate(total=Sum("amount_usd")).order_by("type")
+        def apply_date_filter(qs):
+            if date_from:
+                qs = qs.filter(created_at__date__gte=date_from)
+            if date_to:
+                qs = qs.filter(created_at__date__lte=date_to)
+            return qs
+
+        usage_qs = apply_date_filter(
+            WalletTransaction.objects.filter(tenant=tenant, type__startswith="USAGE_")
+        ).values("type").annotate(total=Sum("amount_usd")).order_by("type")
 
         total_usage = sum((abs(row["total"]) for row in usage_qs), Decimal("0.00"))
+
+        # Topups and adjustments are now filtered by the SAME date range as
+        # usage above, so every total on this response describes the same
+        # time window — previously these two stayed lifetime-scoped even
+        # when usage was windowed, silently mixing time periods on one screen.
         total_topups = (
-            WalletTransaction.objects.filter(tenant=tenant, type="TOPUP")
+            apply_date_filter(WalletTransaction.objects.filter(tenant=tenant, type="TOPUP"))
             .aggregate(total=Sum("amount_usd"))["total"] or Decimal("0.00")
         )
         total_adjustments = (
-            WalletTransaction.objects.filter(tenant=tenant, type="ADJUSTMENT")
+            apply_date_filter(WalletTransaction.objects.filter(tenant=tenant, type="ADJUSTMENT"))
             .aggregate(total=Sum("amount_usd"))["total"] or Decimal("0.00")
         )
+
         wallet = TenantWallet.objects.get(tenant=tenant)
+
+        # current_balance_usd is inherently "right now" — it can never be
+        # scoped to a past date range, so reconciling it against a windowed
+        # total_topups/total_usage would be comparing different time
+        # periods no matter how the numbers above are filtered. Only
+        # compute/return it when no date filter is applied, where it's the
+        # correct lifetime check (topups + adjustments - usage == balance);
+        # otherwise return null rather than a number that LOOKS valid but isn't.
+        reconciliation_delta = None
+        if not date_filtered:
+            reconciliation_delta = total_topups + total_adjustments - total_usage - wallet.balance_usd
+
         return Response({
             "breakdown": [{"type": r["type"], "total_usd": str(abs(r["total"]))} for r in usage_qs],
             "total_usage_usd": str(total_usage),
             "total_topups_usd": str(total_topups),
             "current_balance_usd": str(wallet.balance_usd),
-            "reconciliation_delta": str(total_topups + total_adjustments - total_usage - wallet.balance_usd),
+            "reconciliation_delta": str(reconciliation_delta) if reconciliation_delta is not None else None,
+            "is_date_filtered": date_filtered,
         })

@@ -87,7 +87,39 @@ class InteractionViewSet(TenantModelViewSet):
         user = self.request.user
         serializer.validated_data.pop("tenant", None)
         serializer.validated_data.pop("tenant_id", None)
-        assigned_user = serializer.validated_data.get("user") or user
+
+        # An AGENT may only ever log activity as themself — an ADMIN may
+        # attribute an interaction to any teammate (e.g. logging a call that
+        # actually happened on someone else's desk phone/notes on their
+        # behalf). This mirrors the read-side visibility rule already
+        # enforced by TenantModelViewSet.agent_owner_field for this same
+        # model; previously the write side didn't enforce the equivalent
+        # restriction, letting an AGENT attribute activity to a colleague.
+        requested_user = serializer.validated_data.get("user")
+        if user.role == user.Role.AGENT and requested_user and requested_user.id != user.id:
+            raise ValidationError({"user": "You can only log activity under your own account."})
+        assigned_user = requested_user or user
+
+        # This endpoint is for manual/administrative logging ONLY — it must
+        # never be a second way to "send" an SMS or bill a call. Every real
+        # SMS goes through telephony.views.SMSSendView (which enforces
+        # do_not_contact, lead ownership, platform-fee, and wallet balance
+        # BEFORE actually calling Telnyx), and every real call is created
+        # and billed exclusively by telephony.views.VoiceWebhookView from
+        # Telnyx's own signed webhooks. Blocking outbound SMS creation here
+        # entirely closes the loophole of a fabricated "sent" message with
+        # none of those checks; inbound SMS/any CALL row can still be
+        # logged manually (e.g. noting a call that happened on a physical
+        # desk phone), since those aren't claims of an action THIS request
+        # performed.
+        if (
+            serializer.validated_data.get("type") == Interaction.Type.SMS
+            and serializer.validated_data.get("direction") == Interaction.Direction.OUTBOUND
+        ):
+            raise ValidationError({
+                "detail": "Outbound SMS can't be logged directly — send it from the lead's chat instead.",
+            })
+
         instance = serializer.save(tenant=user.tenant, user=assigned_user)
 
         if instance.lead_id and not instance.lead.contacted_at:
@@ -95,10 +127,9 @@ class InteractionViewSet(TenantModelViewSet):
                 contacted_at=timezone.now()
             )
 
-        # NOTE: CALL-type Interactions are never billed here anymore. Every
-        # call (inbound or outbound) is created AND billed exclusively from
-        # Telnyx's own signed webhooks (telephony.views.VoiceWebhookView —
-        # call.initiated creates the row, call.cost bills it using Telnyx's
-        # own billed_duration_secs). A client can still log a CALL-type
-        # Interaction here for manual note-keeping, but it can no longer
-        # trigger a wallet charge no matter what duration_seconds it sends.
+        # NOTE: CALL-type Interactions are never billed here — every call
+        # (inbound or outbound) is created AND billed exclusively from
+        # Telnyx's own signed webhooks (telephony.views.VoiceWebhookView).
+        # A client can still log a CALL-type Interaction here for manual
+        # note-keeping, but it can no longer trigger a wallet charge no
+        # matter what duration_seconds it sends.
