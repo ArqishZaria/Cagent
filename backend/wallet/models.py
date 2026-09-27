@@ -236,3 +236,18 @@ class WalletTransaction(models.Model):
             notify_low_balance(wallet)
 
         return txn
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["tenant", "type", "created_at"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["related_interaction"],
+                condition=models.Q(related_interaction__isnull=False),
+                name="unique_wallettransaction_per_interaction",
+            ),
+            models.UniqueConstraint(
+                fields=["related_scrape_task"],
+                condition=models.Q(related_scrape_task__isnull=False),
+                name="unique_wallettransaction_per_scrape_task",
+            ),
+        ]
