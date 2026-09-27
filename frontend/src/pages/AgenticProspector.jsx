@@ -4,6 +4,7 @@ import { AlertTriangle, Database, Globe, Search, Sparkles } from "lucide-react";
 import api from "../lib/api";
 import SignalBars from "../components/SignalBars";
 import LeadListItem from "../components/LeadListItem";
+import PageHeader from "../components/PageHeader";
 
 const POLL_INTERVAL_MS = 2500;
 const POLL_TIMEOUT_MS = 300000;
@@ -82,18 +83,8 @@ export default function AgenticProspectorPage() {
   const total = (task?.existing_count || 0) + (task?.master_pulled_count || 0) + (task?.freshly_scraped_count || 0);
 
   return (
-    <div className="min-h-screen">
-      <div className="border-b border-paper-200 bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-8 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-amber/8 border border-amber/25 text-amber-dim">
-            <Sparkles size={22} />
-          </div>
-          <div>
-            <span className="label-eyebrow">AI-powered lead generation · $0.50 per search</span>
-            <h1 className="text-2xl font-display font-semibold text-ink-900">The Prospector</h1>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-full">
+      <PageHeader eyebrow="AI-powered lead generation · $0.50 per search" title="Prospector" />
 
       <div className="max-w-5xl mx-auto px-6 py-8">
         <form onSubmit={search} className="flex gap-2 mb-2">

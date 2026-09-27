@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageSquareText, PhoneIncoming, PhoneMissed, PhoneOutgoing, ScrollText } from "lucide-react";
+import { MessageSquareText, PhoneIncoming, PhoneMissed, PhoneOutgoing } from "lucide-react";
 import api from "../lib/api";
+import PageHeader from "../components/PageHeader";
 
 function formatDuration(seconds) {
   const s = Number(seconds) || 0;
@@ -41,19 +42,11 @@ export default function CallLogsPage() {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="border-b border-paper-200 bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-8 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-signal/8 border border-signal/25 text-signal">
-              <ScrollText size={22} />
-            </div>
-            <div>
-              <span className="label-eyebrow">Call history</span>
-              <h1 className="text-2xl font-display font-semibold text-ink-900">Call logs</h1>
-            </div>
-          </div>
-
+    <div className="min-h-full">
+      <PageHeader
+        eyebrow="Call history"
+        title="Call logs"
+        action={
           <select
             className="input-field !w-auto !py-2 text-sm"
             value={selectedNumberId}
@@ -66,8 +59,8 @@ export default function CallLogsPage() {
               </option>
             ))}
           </select>
-        </div>
-      </div>
+        }
+      />
 
       <div className="max-w-5xl mx-auto px-6 py-8">
         {loading ? (

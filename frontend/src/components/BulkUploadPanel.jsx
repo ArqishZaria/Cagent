@@ -91,30 +91,30 @@ export default function BulkUploadPanel({ onComplete }) {
     <div className="card p-5 mb-8">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Upload size={16} className="text-signal-bright" />
-          <h2 className="font-display font-semibold text-sm">Bulk upload leads</h2>
+          <Upload size={16} className="text-signal" />
+          <h2 className="font-display font-semibold text-sm text-ink-900">Bulk upload leads</h2>
         </div>
         <button
           type="button"
           onClick={downloadTemplate}
-          className="flex items-center gap-1.5 text-xs text-signal-bright hover:underline"
+          className="flex items-center gap-1.5 text-xs text-signal hover:underline"
         >
           <Download size={13} /> Download template
         </button>
       </div>
 
       {task?.status === "COMPLETED" ? (
-        <div className="flex items-start gap-3 rounded-xl border border-live/30 bg-live/10 px-4 py-3">
+        <div className="flex items-start gap-3 rounded-lg border border-live/25 bg-live/5 px-4 py-3">
           <CheckCircle2 size={18} className="text-live shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="text-ink-50 font-medium">
+            <p className="text-ink-900 font-medium">
               Processed {task.total_rows} row{task.total_rows === 1 ? "" : "s"}
             </p>
-            <p className="text-ink-200 text-xs mt-1">
+            <p className="text-ink-500 text-xs mt-1">
               {task.created_count} new leads added · {task.updated_count} existing leads updated
               {task.error_count > 0 && ` · ${task.error_count} rows skipped (no email or phone)`}
             </p>
-            <button onClick={reset} className="text-xs text-signal-bright hover:underline mt-2">
+            <button onClick={reset} className="text-xs text-signal hover:underline mt-2">
               Upload another file
             </button>
           </div>
@@ -127,7 +127,7 @@ export default function BulkUploadPanel({ onComplete }) {
             accept=".csv,.xlsx,.xls"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             disabled={uploading || isProcessing}
-            className="text-xs text-ink-200 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-ink-600 file:text-ink-100 file:text-xs hover:file:bg-ink-500/70"
+            className="text-xs text-ink-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-ink-100 file:text-ink-700 file:text-xs hover:file:bg-ink-200"
           />
           <button
             type="submit"
@@ -153,7 +153,7 @@ export default function BulkUploadPanel({ onComplete }) {
         </div>
       )}
 
-      <p className="text-[11px] text-ink-300 mt-3">
+      <p className="text-[11px] text-ink-400 mt-3">
         Expected columns: first_name, last_name, job_title, company, phone_number, email,
         website, address, city, state. Every row needs at least an email or phone number.
       </p>

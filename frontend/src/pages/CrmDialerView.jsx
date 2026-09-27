@@ -1,7 +1,7 @@
 // frontend/src/pages/CrmDialerView.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { PhoneCall, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import api from "../lib/api";
 import LeadChatPanel from "../components/LeadChatPanel";
 import LeadListItem from "../components/LeadListItem";
@@ -129,10 +129,9 @@ export default function CrmDialerPage() {
     <div className="flex h-full">
       <aside className="w-[320px] shrink-0 border-r border-paper-200 bg-white flex flex-col">
         <div className="px-5 py-4 border-b border-paper-200 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <PhoneCall size={18} className="text-signal" />
-            <h1 className="font-display font-semibold text-ink-900">Chats</h1>
-          </div>
+          <h2 className="font-display font-semibold text-sm text-ink-900">
+            Chats {leads.length > 0 && <span className="text-ink-400 font-normal">({leads.length})</span>}
+          </h2>
           <button
             onClick={() => {
               setSearchOpen((v) => !v);
@@ -185,7 +184,7 @@ export default function CrmDialerPage() {
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 p-4">
         <LeadChatPanel lead={activeLead} fromNumber={fromNumber} />
       </div>
     </div>

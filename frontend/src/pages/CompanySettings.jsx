@@ -1,40 +1,25 @@
 import { useEffect, useState } from "react";
 import {
-  Building2, CheckCircle2, Loader2, Mail, PlusCircle, Search, Users,
+  CheckCircle2, Loader2, Mail, PlusCircle, Search, Users,
 } from "lucide-react";
 import api from "../lib/api";
 import PasswordInput from "../components/PasswordInput";
+import PageHeader from "../components/PageHeader";
 
 /**
  * CompanySettingsPage — the boss-only control room.
  */
 export default function CompanySettingsPage() {
   return (
-    <div className="min-h-screen">
-      <PageHeader />
-      <div className="max-w-6xl mx-auto px-6 pb-16 grid lg:grid-cols-5 gap-6">
+    <div className="min-h-full">
+      <PageHeader eyebrow="Company settings" title="Numbers, team & access" />
+      <div className="max-w-6xl mx-auto px-6 py-8 grid lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 space-y-6">
           <NumberPurchaseCard />
           <TeamCard />
         </div>
         <div className="lg:col-span-2">
           <NumberAssignmentCard />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PageHeader() {
-  return (
-    <div className="border-b border-paper-200 bg-white">
-      <div className="max-w-6xl mx-auto px-6 py-8 flex items-center gap-4">
-        <div className="p-3 rounded-xl bg-signal/8 border border-signal/25 text-signal">
-          <Building2 size={22} />
-        </div>
-        <div>
-          <span className="label-eyebrow">Company settings</span>
-          <h1 className="text-2xl font-display font-semibold text-ink-900">Numbers, team &amp; access</h1>
         </div>
       </div>
     </div>

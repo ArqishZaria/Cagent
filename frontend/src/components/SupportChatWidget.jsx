@@ -9,8 +9,7 @@ import { formatMessageTime } from "../lib/formatTime";
  * mode="floating" (default): renders a launcher button bottom-right that
  *   expands into a chat panel.
  * mode="embedded": renders the chat panel inline with no launcher — used
- *   inside the full-screen Payment Overdue Overlay, where support is the
- *   ONLY thing a locked-out tenant can still reach.
+ *   inside the Support page and the Payment Overdue lockout screen.
  *
  * Attachment support: clicking the paperclip opens a file picker; the
  * selected file rides along with the next message sent, as multipart form
@@ -18,9 +17,8 @@ import { formatMessageTime } from "../lib/formatTime";
  * (attachment_url) that a plain <img> can't load (no way to attach an
  * Authorization header to an <img> tag), so each real attachment is
  * fetched once via an authenticated blob request and cached locally.
- * A failed fetch now surfaces a retryable "couldn't load" chip (and logs
- * to console) instead of silently vanishing, so real failures are visible
- * and debuggable rather than looking like "attachments just don't work."
+ * A failed fetch surfaces a retryable "couldn't load" chip (and logs to
+ * console) instead of silently vanishing.
  */
 export default function SupportChatWidget({ mode = "floating" }) {
   const [open, setOpen] = useState(mode === "embedded");
@@ -78,11 +76,6 @@ export default function SupportChatWidget({ mode = "floating" }) {
         setAttachmentBlobs((prev) => ({ ...prev, [messageId]: blobUrl }));
       })
       .catch((err) => {
-        // Surfaced instead of swallowed — check this in devtools if
-        // attachments still don't load: 401/403 means an auth/tenant
-        // mismatch, 404 means the file isn't on disk, a network-level
-        // failure with no status usually means CORS or the API being
-        // unreachable.
         console.error("Support attachment failed to load:", url, err?.response?.status, err);
         setAttachmentErrors((prev) => ({ ...prev, [messageId]: true }));
       });
@@ -152,7 +145,7 @@ export default function SupportChatWidget({ mode = "floating" }) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-paper-200 bg-paper-50">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-live opacity-60" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-live opacity-50" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-live" />
           </span>
           <h3 className="text-sm font-display font-semibold text-ink-900">Support</h3>

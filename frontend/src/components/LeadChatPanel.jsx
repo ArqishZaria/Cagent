@@ -188,7 +188,7 @@ export default function LeadChatPanel({ lead, fromNumber }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-[11px] font-mono px-2 py-1 rounded-full border ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
+            <span className={`status-pill !text-[11px] !py-1 ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
               {lead.status}
             </span>
             <button

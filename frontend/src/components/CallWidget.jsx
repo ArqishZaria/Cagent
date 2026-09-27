@@ -32,8 +32,8 @@ export default function CallWidget() {
   return (
     <div className="fixed bottom-6 right-6 z-50 w-72 flex flex-col gap-2">
       {waitingCall && (
-        <div className="card-raised overflow-hidden animate-fade-up border-2 !border-live/50">
-          <div className="px-4 py-2.5 bg-live/10 border-b border-live/20">
+        <div className="card-raised overflow-hidden animate-fade-up border-2 !border-live/40">
+          <div className="px-4 py-2.5 bg-live/8 border-b border-live/20">
             <span className="text-[11px] font-mono uppercase tracking-wide text-live">Incoming call</span>
           </div>
           <div className="px-4 py-3">
@@ -43,7 +43,7 @@ export default function CallWidget() {
           <div className="flex items-center justify-center gap-4 pb-4">
             <button
               onClick={acceptWaiting}
-              className="btn-primary !rounded-full !p-3 bg-live border-live-dim/40"
+              className="btn-primary !rounded-full !p-3 !bg-live hover:!bg-live-dim"
               aria-label="Accept and end current call"
               title="Accept — ends your current call"
             >
@@ -80,7 +80,7 @@ export default function CallWidget() {
           <div className="flex items-center justify-center gap-4 pb-5">
             {isIncomingRing ? (
               <>
-                <button onClick={answer} className="btn-primary !rounded-full !p-3.5 bg-live border-live-dim/40" aria-label="Answer">
+                <button onClick={answer} className="btn-primary !rounded-full !p-3.5 !bg-live hover:!bg-live-dim" aria-label="Answer">
                   <Phone size={18} />
                 </button>
                 <button onClick={hangup} className="!rounded-full !p-3.5 bg-alert text-white border border-alert-dim/40 hover:bg-alert-dim transition" aria-label="Decline">

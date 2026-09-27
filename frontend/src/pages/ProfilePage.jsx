@@ -7,6 +7,7 @@ import api from "../lib/api";
 import { useCurrentUser } from "../lib/currentUser";
 import { logout } from "../lib/auth";
 import PasswordInput from "../components/PasswordInput";
+import PageHeader from "../components/PageHeader";
 
 const SUB_STATUS_COLORS = {
   ACTIVE: "bg-live/10 text-live border-live/25",
@@ -22,22 +23,10 @@ export default function ProfilePage() {
     logout();
     navigate("/login");
   };
-  
+
   return (
-    <div className="min-h-screen">
-      <div className="border-b border-paper-200 bg-white">
-        <div className="max-w-4xl mx-auto px-6 py-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-signal/8 border border-signal/25 text-signal">
-              <User size={22} />
-            </div>
-            <div>
-              <span className="label-eyebrow">Your account</span>
-              <h1 className="text-2xl font-display font-semibold text-ink-900">Profile</h1>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-full">
+      <PageHeader eyebrow="Your account" title="Profile" />
 
       {loading || !user ? (
         <div className="flex justify-center py-20">
@@ -49,6 +38,11 @@ export default function ProfilePage() {
           <ChangePasswordCard />
           <CompanyCard user={user} isAdmin={isAdmin} />
           <PhoneNumbersCard user={user} isAdmin={isAdmin} />
+          <div className="lg:col-span-2 flex justify-end">
+            <button onClick={handleLogout} className="btn-secondary !text-alert !border-alert/25 hover:!bg-alert/5">
+              <LogOut size={15} /> Sign out
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -111,7 +105,7 @@ function AccountDetailsCard({ user, onSaved }) {
           <input className="input-field" type="email" value={form.email} onChange={update("email")} />
         </div>
         <div className="flex items-center gap-3 pt-1">
-          <span className={`text-[10px] font-mono uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+          <span className={`status-pill ${
             user.role === "ADMIN" ? "bg-amber/10 text-amber-dim border-amber/25" : "bg-signal/10 text-signal border-signal/25"
           }`}>
             {user.role === "ADMIN" ? "Admin (Boss)" : "Agent"}
@@ -224,7 +218,7 @@ function CompanyCard({ user, isAdmin }) {
         {isAdmin && (
           <div className="flex items-center justify-between">
             <span className="text-ink-500">Subscription</span>
-            <span className={`text-[10px] font-mono uppercase tracking-wide px-2 py-0.5 rounded-full border ${SUB_STATUS_COLORS[user.subscription_status] || SUB_STATUS_COLORS.ACTIVE}`}>
+            <span className={`status-pill ${SUB_STATUS_COLORS[user.subscription_status] || SUB_STATUS_COLORS.ACTIVE}`}>
               {user.subscription_status}
             </span>
           </div>
@@ -233,7 +227,7 @@ function CompanyCard({ user, isAdmin }) {
       </div>
       {isAdmin && (
         <p className="text-[11px] text-ink-400 mt-4 pt-4 border-t border-paper-200">
-          Manage numbers and teammates in <span className="text-signal font-medium">Settings</span>.
+          Manage numbers and teammates in <span className="text-signal font-medium">Company Settings</span>.
         </p>
       )}
     </section>
@@ -270,7 +264,7 @@ function PhoneNumbersCard({ user, isAdmin }) {
         <Loader2 size={16} className="animate-spin text-ink-400" />
       ) : numbers.length === 0 ? (
         <p className="text-xs text-ink-400">
-          {isAdmin ? "No numbers purchased yet — buy one in Settings." : "No number assigned to you yet — ask your admin."}
+          {isAdmin ? "No numbers purchased yet — buy one in Company Settings." : "No number assigned to you yet — ask your admin."}
         </p>
       ) : (
         <div className="grid sm:grid-cols-2 gap-2">

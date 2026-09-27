@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { LineChart } from "lucide-react";
 import api from "../lib/api";
+import PageHeader from "../components/PageHeader";
 
 const TYPE_LABELS = {
   USAGE_CALL: "Calls", USAGE_SMS: "SMS", USAGE_LEAD_SEARCH: "Lead searches",
@@ -36,16 +36,8 @@ export default function TrackFinancesPage() {
   }, [transactions]);
 
   return (
-    <div className="min-h-screen">
-      <div className="border-b border-paper-200 bg-white">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-signal/8 border border-signal/25 text-signal"><LineChart size={22} /></div>
-          <div>
-            <span className="label-eyebrow">Usage & spend</span>
-            <h1 className="text-2xl font-display font-semibold text-ink-900">Track finances</h1>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-full">
+      <PageHeader eyebrow="Usage & spend" title="Usage" />
 
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
         {breakdown && (
@@ -53,9 +45,9 @@ export default function TrackFinancesPage() {
             <h2 className="font-display font-semibold text-sm mb-4 text-ink-900">Spend breakdown</h2>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-paper-200 text-left">
-                  <th className="py-2 pr-4 text-[11px] font-mono uppercase tracking-wide text-ink-500">Category</th>
-                  <th className="py-2 text-[11px] font-mono uppercase tracking-wide text-ink-500 text-right">Total spent</th>
+                <tr className="border-b border-paper-200">
+                  <th className="table-head-cell !py-2 !pr-4">Category</th>
+                  <th className="table-head-cell !py-2 text-right">Total spent</th>
                 </tr>
               </thead>
               <tbody>
@@ -91,12 +83,12 @@ export default function TrackFinancesPage() {
 
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-paper-200 text-left">
-                <th className="py-2 pr-3 text-[11px] font-mono uppercase tracking-wide text-ink-500">Date</th>
-                <th className="py-2 pr-3 text-[11px] font-mono uppercase tracking-wide text-ink-500">Type</th>
-                <th className="py-2 pr-3 text-[11px] font-mono uppercase tracking-wide text-ink-500">Description</th>
-                <th className="py-2 pr-3 text-[11px] font-mono uppercase tracking-wide text-ink-500 text-right">Amount</th>
-                <th className="py-2 text-[11px] font-mono uppercase tracking-wide text-ink-500 text-right">Total spent so far</th>
+              <tr className="border-b border-paper-200">
+                <th className="table-head-cell !py-2 !pr-3">Date</th>
+                <th className="table-head-cell !py-2 !pr-3">Type</th>
+                <th className="table-head-cell !py-2 !pr-3">Description</th>
+                <th className="table-head-cell !py-2 !pr-3 text-right">Amount</th>
+                <th className="table-head-cell !py-2 text-right">Total spent so far</th>
               </tr>
             </thead>
             <tbody>

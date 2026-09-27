@@ -1,6 +1,7 @@
-import { ChevronDown, HelpCircle, LifeBuoy, Search } from "lucide-react";
+import { ChevronDown, HelpCircle, Search } from "lucide-react";
 import { useCurrentUser } from "../lib/currentUser";
 import SupportChatWidget from "../components/SupportChatWidget";
+import PageHeader from "../components/PageHeader";
 import api from "../lib/api";
 import { useEffect, useMemo, useState } from "react";
 
@@ -9,7 +10,7 @@ const FAQS = [
     category: "Getting started",
     items: [
       { q: "What is cagent?", a: "cagent puts your phone system, CRM, and AI lead generation in one place. Calls and texts log automatically to each lead's profile, and the Prospector finds new leads for you." },
-      { q: "How do I get a phone number?", a: "An Admin buys a number under Settings → Phone numbers, searching by area code. Once purchased it can be assigned to any teammate." },
+      { q: "How do I get a phone number?", a: "An Admin buys a number under Company Settings → Phone numbers, searching by area code. Once purchased it can be assigned to any teammate." },
       { q: "Why does the portal sign me out?", a: "For security, you're automatically signed out after 5 minutes of no activity anywhere in the portal." },
     ],
   },
@@ -20,7 +21,7 @@ const FAQS = [
       { q: "What does a search cost?", a: "A flat fee per search, charged only if it actually returns at least one lead — see Usage for the exact rate." },
       { q: "How do I bulk upload leads?", a: "On the Leads tab, use Bulk upload leads and pick a .csv or .xlsx file (download the template first). Rows need at least an email or phone number." },
       { q: "Why did some uploaded rows get rejected?", a: "A row is rejected if it has no email/phone and no verifiable web presence — the reasons are shown after the upload finishes." },
-      { q: "What makes a lead appear in the CRM & dialer tab?", a: "Clicking Contact on a lead in the Leads List — or logging a call/text for it directly — is what moves it into the CRM/Dialer tab." },
+      { q: "What makes a lead appear in the CRM & Dialer tab?", a: "Clicking Contact on a lead in the Leads List — or logging a call/text for it directly — is what moves it into the CRM & Dialer tab." },
     ],
   },
   {
@@ -28,7 +29,7 @@ const FAQS = [
     items: [
       { q: "Why can't I make a call?", a: "Calling needs an active wallet balance and a phone number connected. Check the banner at the top of the portal, or visit Billing to top up." },
       { q: "What happens if a second call comes in while I'm on one?", a: "It's offered as a waiting call — accepting it ends your current call first; declining it only rejects the new one." },
-      { q: "Why was an inbound call marked as missed?", a: "Inbound calls are auto-declined if the wallet balance can't cover at least one minute — it's logged as a missed call in Call logs, not silently dropped." },
+      { q: "Why was an inbound call marked as missed?", a: "Inbound calls are auto-declined if the wallet balance can't cover at least one minute — it's logged as a missed call in Call Logs, not silently dropped." },
     ],
   },
   {
@@ -41,7 +42,7 @@ const FAQS = [
   {
     category: "Billing & wallet",
     items: [
-      { q: "How do I top up my wallet?", a: "Go to Billing → Upload finance for transfer instructions, then send your payment proof through the chat (Admins only) so it can be credited." },
+      { q: "How do I top up my wallet?", a: "Go to Billing for transfer instructions, then send your payment proof through the chat (Admins only) so it can be credited." },
       { q: "What happens at $0 balance?", a: "Calling, texting, and lead searches pause until you top up — nothing else in the portal is affected." },
       { q: "Where can I see what I've spent?", a: "The Usage tab breaks spend down by type (calls, SMS, searches, number rental) — current rates are on this page, in the panel to the right." },
     ],
@@ -49,10 +50,10 @@ const FAQS = [
   {
     category: "Team & numbers",
     items: [
-      { q: "How do I add a teammate?", a: "Admins can add agent accounts under Settings → Add an agent. New accounts always get Agent access." },
-      { q: "How do I assign a number to someone?", a: "In Settings → Assign numbers, pick a teammate from the dropdown next to any owned number." },
+      { q: "How do I add a teammate?", a: "Admins can add agent accounts under Company Settings → Add an agent. New accounts always get Agent access." },
+      { q: "How do I assign a number to someone?", a: "In Company Settings → Assign numbers, pick a teammate from the dropdown next to any owned number." },
       { q: "Can an Agent see every lead?", a: "No — Agents only see leads, calls, and texts assigned to them. Admins see everything for the company." },
-      { q: "How do I deactivate a phone number?", a: "In Settings → Phone numbers, click Deactivate next to an owned number. This permanently releases it from Telnyx — it can't be re-enabled afterward." },
+      { q: "How do I deactivate a phone number?", a: "In Company Settings → Phone numbers, click Deactivate next to an owned number. This permanently releases it from Telnyx — it can't be re-enabled afterward." },
     ],
   },
   {
@@ -87,18 +88,8 @@ export default function SupportPage() {
   }, [query]);
 
   return (
-    <div className="min-h-screen">
-      <div className="border-b border-paper-200 bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-8 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-signal/8 border border-signal/25 text-signal">
-            <LifeBuoy size={22} />
-          </div>
-          <div>
-            <span className="label-eyebrow">Help & support</span>
-            <h1 className="text-2xl font-display font-semibold text-ink-900">Customer support</h1>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-full">
+      <PageHeader eyebrow="Help & support" title="Customer support" />
 
       <div className="max-w-5xl mx-auto px-6 py-8 grid lg:grid-cols-[1fr_360px] gap-6 items-start">
         <div>

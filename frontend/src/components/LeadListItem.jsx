@@ -46,7 +46,7 @@ export default function LeadListItem({ lead, compact = false, active = false, un
         </div>
         <p className="text-[11px] text-ink-500 truncate">{lead.company}</p>
         <div className="flex items-center justify-between mt-1.5">
-          <span className={`text-[10px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded border ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
+          <span className={`status-pill ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
             {lead.status || "NEW"}
           </span>
           {lead.deal_value ? (
@@ -69,7 +69,7 @@ export default function LeadListItem({ lead, compact = false, active = false, un
           )}
         </div>
         {lead.status && (
-          <span className={`text-[10px] font-mono uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
+          <span className={`status-pill shrink-0 ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
             {lead.status}
           </span>
         )}

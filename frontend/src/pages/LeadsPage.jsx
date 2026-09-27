@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardList, Loader2, MessageSquareText, Search } from "lucide-react";
+import { Loader2, MessageSquareText, Search } from "lucide-react";
 import api from "../lib/api";
 import BulkUploadPanel from "../components/BulkUploadPanel";
+import PageHeader from "../components/PageHeader";
 
 const STATUS_COLORS = {
   NEW: "bg-ink-100 text-ink-700 border-ink-200",
@@ -79,20 +80,12 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="border-b border-paper-200 bg-white">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-live/8 border border-live/25 text-live">
-            <ClipboardList size={22} />
-          </div>
-          <div>
-            <span className="label-eyebrow">Your lead database</span>
-            <h1 className="text-2xl font-display font-semibold text-ink-900">
-              Leads {count ? <span className="text-ink-400 font-normal text-lg">({count})</span> : null}
-            </h1>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-full">
+      <PageHeader
+        eyebrow="Your lead database"
+        title="Leads"
+        meta={count ? <span className="text-ink-400 font-normal text-sm">({count})</span> : null}
+      />
 
       <div className="max-w-6xl mx-auto px-6 py-8">
         <BulkUploadPanel onComplete={() => loadLeads()} />
@@ -125,7 +118,7 @@ export default function LeadsPage() {
             <div className="card overflow-hidden overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-paper-200 bg-paper-50 text-left">
+                  <tr className="border-b border-paper-200 bg-paper-50">
                     <Th>Name</Th>
                     <Th>Company</Th>
                     <Th>Location</Th>
@@ -141,14 +134,14 @@ export default function LeadsPage() {
                     const name = `${lead.first_name || ""} ${lead.last_name || ""}`.trim() || "—";
                     const location = [lead.city, lead.state].filter(Boolean).join(", ") || "—";
                     return (
-                      <tr key={lead.id} className="border-b border-paper-100 last:border-b-0 hover:bg-paper-50/60">
+                      <tr key={lead.id} className="table-row">
                         <Td className="font-medium text-ink-900">{name}</Td>
                         <Td>{lead.company || "—"}</Td>
                         <Td className="text-ink-500">{location}</Td>
                         <Td className="font-mono text-xs">{lead.phone_number || "—"}</Td>
                         <Td className="font-mono text-xs">{lead.email || "—"}</Td>
                         <Td>
-                          <span className={`text-[10px] font-mono uppercase tracking-wide px-2 py-0.5 rounded-full border ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
+                          <span className={`status-pill ${STATUS_COLORS[lead.status] || STATUS_COLORS.NEW}`}>
                             {lead.status || "NEW"}
                           </span>
                         </Td>
@@ -179,7 +172,7 @@ export default function LeadsPage() {
 
             {nextUrl && (
               <div className="flex justify-center mt-8">
-                <button onClick={loadMore} disabled={loadingMore} className="btn-ghost !px-6 !py-2.5 text-sm">
+                <button onClick={loadMore} disabled={loadingMore} className="btn-secondary !px-6 !py-2.5 text-sm">
                   {loadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
                   Load more
                 </button>
@@ -193,7 +186,7 @@ export default function LeadsPage() {
 }
 
 function Th({ children }) {
-  return <th className="px-4 py-3 text-[11px] font-mono uppercase tracking-wide text-ink-500">{children}</th>;
+  return <th className="table-head-cell">{children}</th>;
 }
 function Td({ children, className = "" }) {
   return <td className={`px-4 py-3 ${className}`}>{children}</td>;

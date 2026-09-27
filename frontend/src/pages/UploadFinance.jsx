@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, MessageCircle, Wallet } from "lucide-react";
+import { Check, Copy, MessageCircle } from "lucide-react";
 import api from "../lib/api";
 import { useWallet } from "../lib/wallet";
+import PageHeader from "../components/PageHeader";
 
 function CopyableRow({ label, value }) {
   const [copied, setCopied] = useState(false);
@@ -42,26 +43,19 @@ export default function UploadFinancePage() {
   }, []);
 
   return (
-    <div className="min-h-screen">
-      <div className="border-b border-paper-200 bg-white">
-        <div className="max-w-4xl mx-auto px-6 py-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-amber/8 border border-amber/25 text-amber-dim">
-              <Wallet size={22} />
-            </div>
-            <div>
-              <span className="label-eyebrow">Prepaid wallet</span>
-              <h1 className="text-2xl font-display font-semibold text-ink-900">Upload finance</h1>
-            </div>
-          </div>
+    <div className="min-h-full">
+      <PageHeader
+        eyebrow="Prepaid wallet"
+        title="Billing"
+        action={
           <div className="text-right">
             <p className="label-eyebrow">Current balance</p>
             <p className="font-mono text-2xl font-semibold text-ink-900">
               ${wallet ? Number(wallet.balance_usd).toFixed(2) : "—"}
             </p>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="max-w-4xl mx-auto px-6 py-8 grid lg:grid-cols-2 gap-6">
         <section className="card p-6">
