@@ -317,4 +317,53 @@ if not DEBUG:
         for origin in CORS_ALLOWED_ORIGINS
     ]
     
+# ------------------------------------------------------------------------------------
+# Logging — unhandled exceptions and warnings go to gunicorn's stderr (captured in
+# /var/log/voip-saas/gunicorn-error.log by the gunicorn.service ExecStart), instead of
+# vanishing into Django's default mail_admins handler (which needs ADMINS/email
+# configured — ours isn't). django.request logs a full traceback for any 500;
+# individual app loggers (core, telephony, scraper, wallet) get INFO-level visibility
+# since several already call logger.exception()/logger.info() but had nowhere to go.
+# ------------------------------------------------------------------------------------
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        # Your own apps — several already have logger.exception()/logger.info() calls
+        # (telephony.services, telephony.webhook_utils, scraper.tasks, wallet.services,
+        # wallet.tasks, core.admin) that were previously going nowhere.
+        "core": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "telephony": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "scraper": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "wallet": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "support": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "users": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
