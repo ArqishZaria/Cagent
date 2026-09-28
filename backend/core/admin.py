@@ -83,22 +83,63 @@ class InvoiceAdmin(admin.ModelAdmin):
 
     @admin.action(description="Mark selected invoices as paid & reactivate tenant")
     def mark_invoice_as_paid(self, request, queryset):
+        """
+        Marks each selected invoice paid and, where appropriate, reactivates
+        the tenant.
+
+        IMPORTANT — coordination with the wallet-based platform fee system
+        (wallet.services.try_charge_platform_fee): subscription_status can
+        be set to PAID_OVERDUE by that system when the recurring wallet fee
+        can't be deducted, and every billable-action gate in the app
+        (calls, SMS, lead search — see wallet.services.require_platform_fee_current)
+        checks exactly that flag. This action must NEVER blindly force
+        subscription_status = ACTIVE, because doing so would silently clear
+        a legitimate wallet-driven lock for a tenant who has not actually
+        resolved their overdue platform fee — this Invoice may be entirely
+        unrelated to why they're locked out.
+
+        Instead: if the tenant is currently PAID_OVERDUE, defer entirely to
+        the wallet system's own reconciliation (try_charge_platform_fee) —
+        the single real authority on that flag. That function only clears
+        PAID_OVERDUE if the wallet can actually now cover the fee (which a
+        related ManualCredit/top-up would already have provided), exactly
+        like paying an overdue fee any other way. If the tenant is NOT in
+        a wallet-driven lock (e.g. legacy CANCELLED, being reactivated via
+        this older Invoice flow), the original direct-to-ACTIVE behavior is
+        preserved — that path never conflicted with the wallet system in
+        the first place, since wallet.tasks.charge_platform_fees explicitly
+        excludes CANCELLED tenants.
+        """
+        from wallet.services import try_charge_platform_fee
+
         updated = 0
+        still_overdue = 0
         for invoice in queryset.select_related("tenant"):
             invoice.is_paid = True
             invoice.save(update_fields=["is_paid"])
 
             tenant = invoice.tenant
-            tenant.subscription_status = Tenant.SubscriptionStatus.ACTIVE
             tenant.last_payment_date = timezone.now().date()
 
             base_date = tenant.subscription_end_date
             if not base_date or base_date < timezone.now().date():
                 base_date = timezone.now().date()
             tenant.subscription_end_date = base_date + timezone.timedelta(days=30)
-            tenant.save(update_fields=["subscription_status", "last_payment_date", "subscription_end_date"])
 
-            updated += 1
+            if tenant.subscription_status == Tenant.SubscriptionStatus.PAID_OVERDUE:
+                # Wallet-driven lock — let the wallet system decide whether
+                # it can actually be cleared. Save the non-status fields
+                # first so try_charge_platform_fee sees the updated
+                # last_payment_date/subscription_end_date if it reloads.
+                tenant.save(update_fields=["last_payment_date", "subscription_end_date"])
+                if try_charge_platform_fee(tenant):
+                    updated += 1
+                else:
+                    still_overdue += 1
+            else:
+                tenant.subscription_status = Tenant.SubscriptionStatus.ACTIVE
+                tenant.save(update_fields=["subscription_status", "last_payment_date", "subscription_end_date"])
+                updated += 1
 
         self.message_user(
             request,
@@ -110,6 +151,21 @@ class InvoiceAdmin(admin.ModelAdmin):
             % updated,
             messages.SUCCESS,
         )
+        if still_overdue:
+            self.message_user(
+                request,
+                ngettext(
+                    "%d tenant is still PAID_OVERDUE — their wallet still can't cover the "
+                    "recurring platform fee even after this invoice. Credit their wallet "
+                    "(e.g. a ManualCredit) to actually clear the lock.",
+                    "%d tenants are still PAID_OVERDUE — their wallets still can't cover the "
+                    "recurring platform fee even after this invoice. Credit their wallets "
+                    "(e.g. a ManualCredit) to actually clear the lock.",
+                    still_overdue,
+                )
+                % still_overdue,
+                messages.WARNING,
+            )
 
 
 # ------------------------------------------------------------------------------------

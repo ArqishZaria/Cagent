@@ -18,6 +18,12 @@ from wallet.serializers import (
 from wallet.services import FxRateUnavailable, calculate_topup_breakdown, confirm_topup_paid, get_gateway, start_topup
 MIN_TOPUP_USD = Decimal("2.00")
 
+# ACCESS RULE for this module: company-wide financial DETAIL (transaction
+# ledger, spend breakdown, top-up records, invoices, rates) is ADMIN-only.
+# The only things any tenant member may read are the wallet BALANCE summary
+# (WalletSummaryView — needed for the low-balance / overdue banners and to
+# know whether calling is possible) and the manual bank-transfer
+# instructions (ManualPaymentInfoView — not sensitive, shown on Billing).
 
 
 class TopupQuoteView(APIView):
@@ -69,9 +75,9 @@ class TopupCreateView(APIView):
         return Response(WalletTopupSerializer(topup).data, status=status.HTTP_201_CREATED)
 
 class TopupStatusView(APIView):
-    """GET /api/wallet/topups/<id>/ — polled by the frontend while the QR is on screen."""
+    """GET /api/wallet/topups/<id>/ — polled by the frontend while the QR is on screen. ADMIN-only (same as the endpoints that create it)."""
 
-    permission_classes = [IsAuthenticated, IsTenantMember]
+    permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request, pk):
         topup = get_object_or_404(WalletTopup, pk=pk, tenant=request.user.tenant)
@@ -79,7 +85,7 @@ class TopupStatusView(APIView):
 
 
 class TopupInvoiceDownloadView(APIView):
-    permission_classes = [IsAuthenticated, IsTenantMember]
+    permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request, pk):
         topup = get_object_or_404(WalletTopup, pk=pk, tenant=request.user.tenant)
@@ -90,7 +96,7 @@ class TopupInvoiceDownloadView(APIView):
 
 
 class TopupHistoryView(APIView):
-    permission_classes = [IsAuthenticated, IsTenantMember]
+    permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request):
         topups = WalletTopup.objects.filter(tenant=request.user.tenant).order_by("-created_at")[:100]
@@ -159,6 +165,13 @@ class ManualPaymentInfoView(APIView):
         
         
 class WalletSummaryView(APIView):
+    """
+    Deliberately stays IsTenantMember (NOT admin-only): the balance and
+    overdue flags drive the portal-wide low-balance / platform-fee banners
+    and tell every user whether calling/texting is currently possible.
+    Contains no transaction-level detail.
+    """
+
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def get(self, request):
@@ -177,7 +190,9 @@ class WalletSummaryView(APIView):
     
         
 class TransactionListView(APIView):
-    permission_classes = [IsAuthenticated, IsTenantMember]
+    """ADMIN-only: full ledger of every top-up and usage charge for the company."""
+
+    permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request):
         qs = WalletTransaction.objects.filter(tenant=request.user.tenant)
@@ -192,7 +207,9 @@ class TransactionListView(APIView):
 
 
 class TransactionBreakdownView(APIView):
-    permission_classes = [IsAuthenticated, IsTenantMember]
+    """ADMIN-only: company-wide spend breakdown and reconciliation."""
+
+    permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request):
         from django.db.models import Sum

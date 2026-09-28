@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from core.phone_utils import normalize_to_e164
-from core.models import Interaction, Lead
+from core.models import CustomUser, Interaction, Lead
 from core.viewsets import TenantModelViewSet
 from crm.serializers import InteractionSerializer, LeadSerializer
 
@@ -48,6 +48,34 @@ class LeadViewSet(TenantModelViewSet):
             qs = qs.filter(search_filter)
         return qs
 
+    def _enforce_agent_owner_restriction(self, serializer):
+        """
+        An AGENT may only ever set `owner` to themselves (or leave it
+        unchanged) — never to a teammate, and never to null. Previously
+        `owner` was a plain writable field scoped only to "any user in this
+        tenant," with no role check at all: an AGENT could PATCH a lead
+        they owned and hand it to any other teammate (silently losing their
+        own access in the process), or null it out entirely, with no
+        approval step. This mirrors how NumberViewSet already restricts
+        writes to IsTenantAdmin — but leads still need AGENT-level create/
+        update for their own records, so the restriction is scoped to just
+        this one field rather than the whole viewset.
+
+        ADMIN is completely unrestricted here, same as before this fix.
+        """
+        user = self.request.user
+        if user.role != CustomUser.Role.AGENT:
+            return
+        if "owner" not in serializer.validated_data:
+            return
+
+        new_owner = serializer.validated_data.get("owner")
+        if new_owner is None or new_owner.id != user.id:
+            raise ValidationError({
+                "owner": "As an agent, you can only assign leads to yourself — "
+                         "ask an admin to reassign this lead to someone else.",
+            })
+
     def perform_create(self, serializer):
         tenant = self.request.user.tenant
         email = (serializer.validated_data.get("email") or "").strip()
@@ -56,6 +84,8 @@ class LeadViewSet(TenantModelViewSet):
             raise ValidationError({"email": "A lead with this email already exists."})
         if phone and Lead.objects.filter(tenant=tenant, phone_number=phone).exists():
             raise ValidationError({"phone_number": "A lead with this phone number already exists."})
+
+        self._enforce_agent_owner_restriction(serializer)
 
         # The .exists() checks above are a fast pre-check, not a lock — two
         # near-simultaneous requests can both pass them, then both try to
@@ -70,8 +100,11 @@ class LeadViewSet(TenantModelViewSet):
             raise ValidationError({
                 "detail": "A lead with this email or phone number was just created — please refresh and try again.",
             })
-            
-            
+
+    def perform_update(self, serializer):
+        self._enforce_agent_owner_restriction(serializer)
+        super().perform_update(serializer)
+
     @action(detail=True, methods=["post"])
     def contact(self, request, pk=None):
         lead = self.get_object()
@@ -116,23 +149,27 @@ class InteractionViewSet(TenantModelViewSet):
         assigned_user = requested_user or user
 
         # This endpoint is for manual/administrative logging ONLY — it must
-        # never be a second way to "send" an SMS or bill a call. Every real
-        # SMS goes through telephony.views.SMSSendView (which enforces
+        # never be a second way to "send" or "receive" an SMS, in either
+        # direction. Every real SMS is created exclusively server-side:
+        # outbound via telephony.views.SMSSendView (which enforces
         # do_not_contact, lead ownership, platform-fee, and wallet balance
-        # BEFORE actually calling Telnyx), and every real call is created
-        # and billed exclusively by telephony.views.VoiceWebhookView from
-        # Telnyx's own signed webhooks. Blocking outbound SMS creation here
-        # entirely closes the loophole of a fabricated "sent" message with
-        # none of those checks; inbound SMS/any CALL row can still be
-        # logged manually (e.g. noting a call that happened on a physical
-        # desk phone), since those aren't claims of an action THIS request
-        # performed.
-        if (
-            serializer.validated_data.get("type") == Interaction.Type.SMS
-            and serializer.validated_data.get("direction") == Interaction.Direction.OUTBOUND
-        ):
+        # BEFORE actually calling Telnyx), and inbound via
+        # telephony.views.SMSWebhookView, driven only by Telnyx's own
+        # cryptographically-signed webhook payloads (see
+        # telephony.webhook_utils.verify_telnyx_webhook). If a client could
+        # POST type=SMS, direction=INBOUND here, they could fabricate a
+        # message that appears to come from the lead — with no signature,
+        # no Telnyx event behind it, and no billing — and it would render
+        # directly in that lead's chat thread (LeadChatPanel) as if the
+        # lead had actually sent it. Blocking BOTH directions closes that
+        # entirely; CALL-type rows are unaffected and can still be logged
+        # manually (e.g. noting a call that happened on a physical desk
+        # phone), since a manually-logged call is not itself a claim that
+        # this request transmitted anything.
+        if serializer.validated_data.get("type") == Interaction.Type.SMS:
             raise ValidationError({
-                "detail": "Outbound SMS can't be logged directly — send it from the lead's chat instead.",
+                "detail": "SMS interactions can't be logged directly — they're created automatically when a "
+                          "message is actually sent or received.",
             })
 
         instance = serializer.save(tenant=user.tenant, user=assigned_user)

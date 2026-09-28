@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, MessageCircle } from "lucide-react";
 import api from "../lib/api";
 import { useWallet } from "../lib/wallet";
+import { useCurrentUser } from "../lib/currentUser";
 import PageHeader from "../components/PageHeader";
 
 function CopyableRow({ label, value }) {
@@ -30,17 +31,25 @@ function CopyableRow({ label, value }) {
 
 export default function UploadFinancePage() {
   const { wallet, refresh } = useWallet();
+  const { isAdmin } = useCurrentUser();
   const [paymentInfo, setPaymentInfo] = useState(null);
   const [recentTopups, setRecentTopups] = useState([]);
 
   useEffect(() => {
-    api.get("/api/wallet/manual-payment-info/").then((res) => setPaymentInfo(res.data));
-    api
-      .get("/api/wallet/transactions/", { params: { type: "TOPUP" } })
-      .then((res) => setRecentTopups(res.data || []));
+    api.get("/api/wallet/manual-payment-info/").then((res) => setPaymentInfo(res.data)).catch(() => {});
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The transaction ledger is ADMIN-only on the backend — only request it
+  // for admins (an agent would just get a 403).
+  useEffect(() => {
+    if (!isAdmin) return;
+    api
+      .get("/api/wallet/transactions/", { params: { type: "TOPUP" } })
+      .then((res) => setRecentTopups(res.data || []))
+      .catch(() => {});
+  }, [isAdmin]);
 
   return (
     <div className="min-h-full">
@@ -82,25 +91,34 @@ export default function UploadFinancePage() {
           </div>
         </section>
 
-        <section className="card p-6">
-          <h2 className="font-display font-semibold text-lg mb-4 text-ink-900">Recent top-ups</h2>
-          <div className="space-y-2">
-            {recentTopups.map((t) => (
-              <div key={t.id} className="ledger-row !py-3">
-                <span>
-                  <span className="block text-ink-900">{t.description}</span>
-                  <span className="block text-[11px] text-ink-400">
-                    {new Date(t.created_at).toLocaleString()}
+        {isAdmin ? (
+          <section className="card p-6">
+            <h2 className="font-display font-semibold text-lg mb-4 text-ink-900">Recent top-ups</h2>
+            <div className="space-y-2">
+              {recentTopups.map((t) => (
+                <div key={t.id} className="ledger-row !py-3">
+                  <span>
+                    <span className="block text-ink-900">{t.description}</span>
+                    <span className="block text-[11px] text-ink-400">
+                      {new Date(t.created_at).toLocaleString()}
+                    </span>
                   </span>
-                </span>
-                <span className="font-mono text-live">+${Number(t.amount_usd).toFixed(2)}</span>
-              </div>
-            ))}
-            {recentTopups.length === 0 && (
-              <p className="text-xs text-ink-400 text-center py-8">No top-ups yet.</p>
-            )}
-          </div>
-        </section>
+                  <span className="font-mono text-live">+${Number(t.amount_usd).toFixed(2)}</span>
+                </div>
+              ))}
+              {recentTopups.length === 0 && (
+                <p className="text-xs text-ink-400 text-center py-8">No top-ups yet.</p>
+              )}
+            </div>
+          </section>
+        ) : (
+          <section className="card p-6">
+            <h2 className="font-display font-semibold text-lg mb-2 text-ink-900">Top-up history</h2>
+            <p className="text-sm text-ink-500">
+              Top-up history and spend details are only visible to your company's Admin.
+            </p>
+          </section>
+        )}
       </div>
     </div>
   );

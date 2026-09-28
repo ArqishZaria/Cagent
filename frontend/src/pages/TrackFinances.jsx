@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Loader2, Lock } from "lucide-react";
 import api from "../lib/api";
+import { useCurrentUser } from "../lib/currentUser";
 import PageHeader from "../components/PageHeader";
 
 const TYPE_LABELS = {
@@ -9,6 +11,7 @@ const TYPE_LABELS = {
 };
 
 export default function TrackFinancesPage() {
+  const { isAdmin, loading: userLoading } = useCurrentUser();
   const [breakdown, setBreakdown] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [dateFrom, setDateFrom] = useState("");
@@ -16,13 +19,17 @@ export default function TrackFinancesPage() {
   const [typeFilter, setTypeFilter] = useState("");
 
   useEffect(() => {
+    // Company financials are ADMIN-only on the backend too — never even
+    // fire these requests for an agent (they'd just 403).
+    if (!isAdmin) return;
     const params = {};
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
-    api.get("/api/wallet/transactions/breakdown/", { params }).then((res) => setBreakdown(res.data));
+    api.get("/api/wallet/transactions/breakdown/", { params }).then((res) => setBreakdown(res.data)).catch(() => {});
     api.get("/api/wallet/transactions/", { params: { ...params, ...(typeFilter ? { type: typeFilter } : {}) } })
-      .then((res) => setTransactions(res.data));
-  }, [dateFrom, dateTo, typeFilter]);
+      .then((res) => setTransactions(res.data))
+      .catch(() => {});
+  }, [isAdmin, dateFrom, dateTo, typeFilter]);
 
   const rows = useMemo(() => {
     const ascending = [...transactions].reverse();
@@ -34,6 +41,31 @@ export default function TrackFinancesPage() {
       })
       .reverse();
   }, [transactions]);
+
+  if (userLoading) {
+    return (
+      <div className="min-h-full">
+        <PageHeader eyebrow="Usage & spend" title="Usage" />
+        <div className="flex justify-center py-20">
+          <Loader2 className="animate-spin text-ink-400" size={22} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-full">
+        <PageHeader eyebrow="Usage & spend" title="Usage" />
+        <div className="max-w-xl mx-auto px-6 py-16 text-center">
+          <Lock size={22} className="text-ink-400 mx-auto mb-3" />
+          <p className="text-sm text-ink-600">
+            Company spend and usage details are only visible to your company's Admin.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full">

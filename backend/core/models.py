@@ -10,6 +10,7 @@ from decimal import Decimal
 from core.phone_utils import normalize_to_e164
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.functions import Lower
 
 
 class Tenant(models.Model):
@@ -65,13 +66,6 @@ class Invoice(models.Model):
 
     def __str__(self):
         return f"{self.invoice_number} ({self.tenant.company_name})"
-
-
-from decimal import Decimal
-from core.phone_utils import normalize_to_e164
-from django.contrib.auth.models import AbstractUser
-from django.db import models
-from django.db.models.functions import Lower   # <-- added
 
 
 class CustomUser(AbstractUser):
@@ -182,9 +176,11 @@ class Lead(models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["tenant", "email"],
+                Lower("email"),
+                "tenant",
                 condition=~models.Q(email=""),
-                name="unique_tenant_email_when_present",
+                name="unique_tenant_email_ci_when_present",
+                violation_error_message="A lead with this email already exists.",
             ),
             models.UniqueConstraint(
                 fields=["tenant", "phone_number"],
@@ -364,9 +360,10 @@ class MasterLead(models.Model):
         ordering = ["-verified_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["email"],
+                Lower("email"),
                 condition=~models.Q(email=""),
-                name="unique_master_email_when_present",
+                name="unique_master_email_ci_when_present",
+                violation_error_message="A master lead with this email already exists.",
             ),
             models.UniqueConstraint(
                 fields=["phone_number"],

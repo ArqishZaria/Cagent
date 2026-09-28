@@ -96,6 +96,15 @@ class WebRTCCredentialsView(APIView):
     login token, so the dialer never even connects. Per-second call cost
     is still billed at hangup (see bill_call below) — these gates only
     stop calling from starting at all.
+
+    IMPORTANT: this check happens once, at token-mint time. A token stays
+    valid for the life of the WebRTC session, so this alone does NOT stop
+    a call placed later in that same session after the balance has since
+    dropped to zero (e.g. from other usage) — that is why
+    _handle_outbound_call_initiated below has its OWN independent gate,
+    enforced by Telnyx itself at the moment a call actually starts. Treat
+    this view's checks as a fast-fail UX convenience, not the security
+    boundary.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -132,12 +141,16 @@ class CallEligibilityView(APIView):
     """
     POST /api/telephony/calls/check-balance/
 
-    The frontend hits this right before dialing (useTelnyxCall.startCall),
-    so an outbound call never even rings if the platform fee is overdue or
-    the wallet can't cover at least one minute at the outbound rate —
-    bill_call() always rounds up to a minimum of 1 minute, so that's the
-    real minimum cost of any call. Mirrors the inbound auto-decline gate in
-    VoiceWebhookView._handle_call_initiated below.
+    The frontend hits this right before dialing (useTelnyxCall.startCall)
+    purely for UX — so the user sees a clear "top up to call" message
+    instead of a call that rings then gets silently killed. This is NOT
+    the security boundary: it is a client-side convenience check that a
+    modified or bypassed client could skip entirely by calling the Telnyx
+    SDK's newCall() directly. The real, unbypassable enforcement lives in
+    _handle_outbound_call_initiated below, which runs from Telnyx's own
+    call.initiated webhook the instant a call actually starts — the
+    client has no way to prevent that webhook from firing or from being
+    checked.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -272,12 +285,26 @@ class VoiceWebhookView(APIView):
         """
         Fires for every call placed from our own WebRTC dialer
         (direction="outgoing", confirmed via live webhook inspection on
-        2026-09-27). This is now the ONLY place an outbound Interaction row
-        is created — the client no longer POSTs one after hangup (see
+        2026-09-27). This is the ONLY place an outbound Interaction row is
+        created — the client no longer POSTs one after hangup (see
         useTelnyxCall.js). Attribution mirrors the inbound handler exactly,
         with from/to swapped: our own Telnyx number tells us the tenant and
         the assigned agent; the dialed number is looked up (or created, same
         get_or_create fallback the inbound side already uses) as a Lead.
+
+        SECURITY: this now also carries its own platform-fee/balance gate,
+        mirroring _handle_inbound_call_initiated exactly. This is the real
+        enforcement boundary for outbound calls — WebRTCCredentialsView and
+        CallEligibilityView are both client-side pre-checks a modified
+        client could skip entirely by calling the Telnyx SDK's newCall()
+        directly once it holds a valid token; this handler cannot be
+        skipped, because it runs from Telnyx's own signed call.initiated
+        webhook the instant the call actually starts, regardless of what
+        checks (if any) the client performed first. If the tenant is
+        over-drawn or fee-overdue at that exact moment, the call is hung up
+        immediately via the Telnyx API — before it ever connects to the
+        lead — and logged as missed, the same way an auto-declined inbound
+        call is logged.
         """
         cache_key = f"telnyx:call_interaction:{call_control_id}"
         if cache.get(cache_key):
@@ -303,6 +330,41 @@ class VoiceWebhookView(APIView):
             defaults={"status": Lead.Status.NEW, "owner": assigned_user},
         )
         _mark_contacted_if_needed(lead)
+
+        try:
+            require_platform_fee_current(tenant)
+        except PlatformFeeOverdue:
+            logger.info(
+                "Killing outbound call from %s — platform fee overdue for tenant %s "
+                "(client-side pre-check was bypassed or stale)",
+                from_number, tenant.company_name,
+            )
+            Interaction.objects.create(
+                tenant=tenant, user=assigned_user, lead=lead,
+                type=Interaction.Type.CALL, direction=Interaction.Direction.OUTBOUND,
+                phone_number=phone_number, duration_seconds=0, missed=True,
+                notes="Auto-terminated — platform fee overdue.",
+            )
+            self._decline_call(call_control_id)
+            return
+
+        per_minute = PricingRate.get_cost(PricingRate.Key.CALL_OUTBOUND_PER_MINUTE)
+        try:
+            require_balance(tenant, per_minute)
+        except InsufficientBalance:
+            logger.info(
+                "Killing outbound call from %s — insufficient balance for tenant %s "
+                "(client-side pre-check was bypassed or stale)",
+                from_number, tenant.company_name,
+            )
+            Interaction.objects.create(
+                tenant=tenant, user=assigned_user, lead=lead,
+                type=Interaction.Type.CALL, direction=Interaction.Direction.OUTBOUND,
+                phone_number=phone_number, duration_seconds=0, missed=True,
+                notes="Auto-terminated — insufficient wallet balance.",
+            )
+            self._decline_call(call_control_id)
+            return
 
         interaction = Interaction.objects.create(
             tenant=tenant,

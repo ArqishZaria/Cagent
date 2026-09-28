@@ -12,6 +12,10 @@ import CallWidget from "./CallWidget";
 import LowBalanceBanner from "./LowBalanceBanner";
 import PlatformFeeOverdueBanner from "./PlatformFeeOverdueBanner";
 
+// adminOnly: hidden from AGENT users. The backend enforces the same rule
+// (wallet.views.TransactionListView / TransactionBreakdownView are
+// IsTenantAdmin) — hiding the link is just so agents don't land on a page
+// that can only tell them "admins only".
 const NAV_SECTIONS = [
   {
     label: "Workspace",
@@ -26,7 +30,7 @@ const NAV_SECTIONS = [
     label: "Finance",
     items: [
       { to: "/app/finance/upload", label: "Billing", icon: Wallet },
-      { to: "/app/finance/track", label: "Usage", icon: LineChart },
+      { to: "/app/finance/track", label: "Usage", icon: LineChart, adminOnly: true },
     ],
   },
   {
@@ -77,6 +81,8 @@ export default function PortalLayout() {
 }
 
 function SideNav() {
+  const { isAdmin } = useCurrentUser();
+
   return (
     <nav className="w-64 shrink-0 border-r border-paper-200 bg-white hidden md:flex flex-col py-5 h-full">
       <div className="flex items-center gap-2.5 px-5 mb-7 shrink-0">
@@ -93,23 +99,25 @@ function SideNav() {
               {section.label}
             </p>
             <div className="space-y-0.5">
-              {section.items.map(({ to, label, icon: Icon, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] font-medium transition ${
-                      isActive
-                        ? "bg-signal/8 text-signal"
-                        : "text-ink-600 hover:bg-paper-100 hover:text-ink-900"
-                    }`
-                  }
-                >
-                  <Icon size={16} strokeWidth={2} />
-                  {label}
-                </NavLink>
-              ))}
+              {section.items
+                .filter((item) => !item.adminOnly || isAdmin)
+                .map(({ to, label, icon: Icon, end }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] font-medium transition ${
+                        isActive
+                          ? "bg-signal/8 text-signal"
+                          : "text-ink-600 hover:bg-paper-100 hover:text-ink-900"
+                      }`
+                    }
+                  >
+                    <Icon size={16} strokeWidth={2} />
+                    {label}
+                  </NavLink>
+                ))}
             </div>
           </div>
         ))}
