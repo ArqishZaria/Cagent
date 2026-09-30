@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { logout } from "../lib/auth";
 
 const IDLE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
 const ACTIVITY_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
@@ -8,7 +9,8 @@ const ACTIVITY_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scr
  * useIdleLogout — signs the user out after 5 minutes with no mouse/keyboard/
  * touch/scroll activity anywhere in the portal. Only mounted inside
  * PortalLayout, so it never runs on the public marketing site or the login
- * page itself.
+ * page itself. Uses the shared logout() so the refresh token is also
+ * blacklisted server-side.
  */
 export default function useIdleLogout() {
   const navigate = useNavigate();
@@ -16,17 +18,15 @@ export default function useIdleLogout() {
   useEffect(() => {
     let timeoutId;
 
-    const logout = () => {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("last_active");
+    const signOut = () => {
+      logout();
       navigate("/login");
     };
 
     const resetTimer = () => {
       localStorage.setItem("last_active", String(Date.now()));
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(logout, IDLE_LIMIT_MS);
+      timeoutId = setTimeout(signOut, IDLE_LIMIT_MS);
     };
 
     ACTIVITY_EVENTS.forEach((evt) => window.addEventListener(evt, resetTimer));

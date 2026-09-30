@@ -3,6 +3,7 @@ from django.urls import include, path
 
 from core.auth_views import ThrottledTokenObtainPairView, ThrottledTokenRefreshView
 from core.contact_views import ContactSubmitView
+from core.auth_views import LogoutView, ThrottledTokenObtainPairView, ThrottledTokenRefreshView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -15,4 +16,6 @@ urlpatterns = [
     path("api/support/", include("support.urls")),
     path("api/", include("crm.urls")),
     path("api/wallet/", include("wallet.urls")),
+    path("api/auth/token/refresh/", ThrottledTokenRefreshView.as_view(), name="token_refresh"),
+    path("api/auth/logout/", LogoutView.as_view(), name="token_logout"),
 ]

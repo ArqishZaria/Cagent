@@ -8,8 +8,6 @@ convention.
 
 import pandas as pd
 
-# Each Lead field maps to a list of acceptable column header spellings
-# (already lowercased for matching).
 COLUMN_ALIASES = {
     "first_name": ["first_name", "first name", "firstname"],
     "last_name": ["last_name", "last name", "lastname"],
@@ -42,23 +40,35 @@ def _build_column_map(columns):
     return mapping
 
 
+def _read_capped(file_path: str) -> "pd.DataFrame":
+    """
+    Reads at most MAX_ROWS + 1 rows. The +1 lets us detect "too many rows"
+    without ever materializing the whole file — previously the full file was
+    parsed first and only THEN length-checked, defeating the cap.
+    """
+    limit = MAX_ROWS + 1
+    lower = file_path.lower()
+    try:
+        if lower.endswith(".csv"):
+            return pd.read_csv(file_path, dtype=str, keep_default_na=False, nrows=limit)
+        if lower.endswith((".xlsx", ".xls")):
+            return pd.read_excel(file_path, dtype=str, nrows=limit).fillna("")
+    except Exception as exc:
+        raise LeadFileParseError(
+            "Couldn't read that file — make sure it's a valid, uncorrupted .csv or .xlsx."
+        ) from exc
+    raise LeadFileParseError("Unsupported file type — please upload a .csv or .xlsx file.")
+
+
 def parse_lead_file(file_path: str) -> list[dict]:
     """
     Returns a list of dicts, one per row, with keys matching Lead's field
-    names (first_name, last_name, job_title, company, phone_number, email,
-    website, address, city, state). Missing columns simply come through as
-    empty strings.
+    names. Missing columns simply come through as empty strings.
     """
-    if file_path.lower().endswith(".csv"):
-        df = pd.read_csv(file_path, dtype=str, keep_default_na=False)
-    elif file_path.lower().endswith((".xlsx", ".xls")):
-        df = pd.read_excel(file_path, dtype=str)
-        df = df.fillna("")
-    else:
-        raise LeadFileParseError("Unsupported file type — please upload a .csv or .xlsx file.")
+    df = _read_capped(file_path)
 
     if len(df) > MAX_ROWS:
-        raise LeadFileParseError(f"File has {len(df)} rows — the current limit is {MAX_ROWS} per upload.")
+        raise LeadFileParseError(f"File has more than {MAX_ROWS} rows — the current limit is {MAX_ROWS} per upload.")
 
     column_map = _build_column_map(df.columns)
     if "email" not in column_map and "phone_number" not in column_map:

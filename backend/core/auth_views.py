@@ -28,6 +28,9 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 logger = logging.getLogger(__name__)
 
@@ -68,3 +71,36 @@ class ThrottledTokenRefreshView(TokenRefreshView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
         return super().post(request, *args, **kwargs)
+    
+    
+    
+@method_decorator(ratelimit(key="ip", rate="30/m", method="POST", block=False), name="post")
+class LogoutView(APIView):
+    """
+    POST /api/auth/logout/  Body: {"refresh": "<refresh token>"}
+
+    Blacklists the refresh token server-side so it can never mint another
+    access token, even if it was copied before logout. Idempotent: an
+    already-expired, already-blacklisted, or malformed token still returns
+    success (the client is logging out either way). Same
+    authentication_classes = [] reasoning as the other auth views.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        if getattr(request, "limited", False):
+            return Response(
+                {"detail": "Too many requests — please try again shortly."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        refresh = request.data.get("refresh")
+        if isinstance(refresh, str) and refresh:
+            try:
+                RefreshToken(refresh).blacklist()
+            except TokenError:
+                pass  # expired / already blacklisted / invalid — nothing left to revoke
+
+        return Response({"detail": "Logged out."})

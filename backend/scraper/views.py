@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 
@@ -19,8 +20,30 @@ from scraper.tasks import process_lead_upload, run_lead_scrape
 from wallet.models import PricingRate
 from wallet.services import InsufficientBalance, PlatformFeeOverdue, require_balance, require_platform_fee_current
 
-ALLOWED_UPLOAD_EXTENSIONS = (".csv", ".xlsx", ".xls")
+logger = logging.getLogger(__name__)
 
+ALLOWED_UPLOAD_EXTENSIONS = (".csv", ".xlsx", ".xls")
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB — ~5000 rows of lead data is well under 1 MB
+
+MAX_QUERY_LENGTH = 200
+MAX_QUERY_TERMS = 15
+
+
+def clean_search_query(raw):
+    """
+    Shared validation for the paid Prospector search and the free
+    existing-leads lookup. Returns (query, error_message); exactly one is None/empty.
+    Collapses whitespace, and rejects non-string input instead of crashing on .strip().
+    """
+    raw = raw if isinstance(raw, str) else ""
+    query = " ".join(raw.split())
+    if not query:
+        return "", "query is required."
+    if len(query) > MAX_QUERY_LENGTH:
+        return "", f"Search is too long — max {MAX_QUERY_LENGTH} characters."
+    if len(query.split()) > MAX_QUERY_TERMS:
+        return "", f"Search has too many words — max {MAX_QUERY_TERMS}."
+    return query, None
 
 class ScrapeTaskStatusView(APIView):
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -61,10 +84,9 @@ class ScrapeSearchView(APIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        query = (request.data.get("query") or "").strip()
-        if not query:
-            return Response({"detail": "query is required."}, status=status.HTTP_400_BAD_REQUEST)
-
+        query, error = clean_search_query(request.data.get("query"))
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
         try:
             require_platform_fee_current(request.user.tenant)
         except PlatformFeeOverdue as exc:
@@ -120,10 +142,9 @@ class ExistingLeadsSearchView(APIView):
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def get(self, request):
-        query = (request.query_params.get("query") or "").strip()
-        if not query:
-            return Response({"detail": "query is required."}, status=status.HTTP_400_BAD_REQUEST)
-
+        query, error = clean_search_query(request.query_params.get("query"))
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
         q_filter = Q()
         for term in query.split():
             q_filter |= (
@@ -142,21 +163,29 @@ class ExistingLeadsSearchView(APIView):
         return Response(LeadSerializer(leads, many=True, context={"request": request}).data)
 
 
+@method_decorator(
+    ratelimit(key="user", rate="10/h", method="POST", block=False),
+    name="post",
+)
 class LeadUploadView(APIView):
     """
     POST /api/scraper/upload/  (multipart/form-data, field name "file")
 
-    Accepts a .csv or .xlsx file, saves it to a temp folder, and queues
-    background processing (scraper.tasks.process_lead_upload). Not billed
-    directly — any per-row enrichment scrape inside process_lead_upload
-    that hits the same $0-cost pipeline as the Prospector isn't currently
-    metered; flag if you want a per-row or per-upload charge added here too.
+    Rate-limited (10/hour per user) and size-capped (5 MB) BEFORE anything is
+    written to disk. Row count is enforced during parsing (see
+    scraper.upload_service), which never loads more than MAX_ROWS + 1 rows.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
     parser_classes = [MultiPartParser]
 
     def post(self, request):
+        if getattr(request, "limited", False):
+            return Response(
+                {"detail": "Upload limit reached: max 10 uploads per hour."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
         file_obj = request.FILES.get("file")
         if not file_obj:
             return Response({"detail": "file is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -167,9 +196,15 @@ class LeadUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if file_obj.size > MAX_UPLOAD_BYTES:
+            return Response(
+                {"detail": f"File is too large — max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB."},
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
+
         upload_dir = os.path.join(settings.BASE_DIR, "lead_uploads")
         os.makedirs(upload_dir, exist_ok=True)
-        ext = os.path.splitext(file_obj.name)[1]
+        ext = os.path.splitext(file_obj.name)[1].lower()
         temp_path = os.path.join(upload_dir, f"{uuid.uuid4().hex}{ext}")
 
         with open(temp_path, "wb") as f:
@@ -179,16 +214,31 @@ class LeadUploadView(APIView):
         upload_task = LeadUploadTask.objects.create(
             tenant=request.user.tenant,
             requested_by=request.user,
-            original_filename=file_obj.name,
+            original_filename=file_obj.name[:255],
             status=LeadUploadTask.Status.PENDING,
         )
-        process_lead_upload.delay(upload_task.id, temp_path)
+
+        try:
+            process_lead_upload.delay(upload_task.id, temp_path)
+        except Exception:
+            # Broker (Redis) down — don't leave an orphaned temp file or a
+            # task stuck on PENDING forever.
+            logger.exception("Couldn't queue LeadUploadTask %s", upload_task.id)
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+            upload_task.status = LeadUploadTask.Status.FAILED
+            upload_task.save(update_fields=["status"])
+            return Response(
+                {"detail": "Upload service is temporarily unavailable — please try again."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return Response(
             {"id": upload_task.id, "status": upload_task.status},
             status=status.HTTP_202_ACCEPTED,
         )
-
 
 class LeadUploadStatusView(APIView):
     permission_classes = [IsAuthenticated, IsTenantMember]
