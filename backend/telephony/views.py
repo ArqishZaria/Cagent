@@ -108,7 +108,7 @@ class WebRTCCredentialsView(APIView):
         except PlatformFeeOverdue as exc:
             return Response(
                 {
-                    "detail": f"Platform fee (${exc.amount_due}) is overdue — top up to keep calling.",
+                    "detail": str(exc),
                     "code": "platform_fee_overdue",
                 },
                 status=status.HTTP_402_PAYMENT_REQUIRED,
@@ -149,7 +149,7 @@ class CallEligibilityView(APIView):
         except PlatformFeeOverdue as exc:
             return Response(
                 {
-                    "detail": f"Platform fee (${exc.amount_due}) is overdue — top up to keep calling.",
+                    "detail": str(exc),
                     "code": "platform_fee_overdue",
                 },
                 status=status.HTTP_402_PAYMENT_REQUIRED,
@@ -431,12 +431,11 @@ class SMSSendView(APIView):
         except PlatformFeeOverdue as exc:
             return Response(
                 {
-                    "detail": f"Platform fee (${exc.amount_due}) is overdue — top up to keep texting.",
+                    "detail": str(exc),
                     "code": "platform_fee_overdue",
                 },
                 status=status.HTTP_402_PAYMENT_REQUIRED,
             )
-
         sender_number = get_object_or_404(
             PhoneNumber, phone_number=from_number, tenant=request.user.tenant, is_active=True
         )
@@ -595,8 +594,10 @@ class NumberPurchaseView(APIView):
             require_platform_fee_current(request.user.tenant)
         except PlatformFeeOverdue as exc:
             return Response(
-                {"detail": f"Platform fee (${exc.amount_due}) is overdue — top up to buy a number.",
-                 "code": "platform_fee_overdue"},
+                {
+                    "detail": str(exc),
+                    "code": "platform_fee_overdue",
+                },
                 status=status.HTTP_402_PAYMENT_REQUIRED,
             )
 

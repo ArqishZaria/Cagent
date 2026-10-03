@@ -7,7 +7,6 @@ math right.
 import calendar
 import logging
 import math
-import re
 import uuid
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -35,14 +34,19 @@ class InsufficientBalance(Exception):
 
 class PlatformFeeOverdue(Exception):
     """
-    Raised by require_platform_fee_current() when a tenant's recurring
-    platform fee couldn't be deducted and they're locked out of billable
-    actions (calls, SMS, lead search) until they recharge.
+    Raised by require_platform_fee_current() when a tenant isn't ACTIVE:
+    either the recurring platform fee couldn't be deducted (PAID_OVERDUE) or
+    the account was cancelled. `status` lets views word the message correctly.
     """
 
-    def __init__(self, amount_due):
+    def __init__(self, amount_due, status=None):
         self.amount_due = amount_due
-        super().__init__(f"Platform fee of ${amount_due} is overdue — recharge the wallet to continue.")
+        self.status = status
+        if status == Tenant.SubscriptionStatus.CANCELLED:
+            msg = "This account has been cancelled — contact support to reactivate it."
+        else:
+            msg = f"Platform fee of ${amount_due} is overdue — recharge the wallet to continue."
+        super().__init__(msg)
 
 
 def get_gateway():
@@ -77,6 +81,7 @@ def get_usd_to_pkr_rate() -> Decimal:
         logger.exception("FX rate API returned a non-numeric PKR rate: %r", rate)
         raise FxRateUnavailable("Exchange rate service returned an invalid rate.") from exc
 
+
 def calculate_platform_fee(usd_amount: Decimal) -> Decimal:
     """
     No top-up fee anymore — every dollar requested is credited to the
@@ -86,6 +91,7 @@ def calculate_platform_fee(usd_amount: Decimal) -> Decimal:
     wallet_invoices PDF) keeps working with zero other changes.
     """
     return Decimal("0.00")
+
 
 def calculate_topup_breakdown(usd_amount: Decimal) -> dict:
     """
@@ -193,6 +199,7 @@ def confirm_topup_paid(topup: WalletTopup) -> WalletTopup:
 
     return topup
 
+
 # --- Usage billing -----------------------------------------------------------------------
 
 
@@ -209,26 +216,31 @@ def require_platform_fee_current(tenant):
     """
     if tenant.subscription_status != Tenant.SubscriptionStatus.ACTIVE:
         cost = PricingRate.get_cost(PricingRate.Key.PLATFORM_FEE_MONTHLY)
-        raise PlatformFeeOverdue(cost)
+        raise PlatformFeeOverdue(cost, status=tenant.subscription_status)
+
 
 def try_charge_platform_fee(tenant) -> bool:
     """
     Charges the recurring monthly platform fee for `tenant` if (and only
-    if) it's currently due. Called from two places:
+    if) it's currently due. Called from:
       - wallet.tasks.charge_platform_fees, the daily beat sweep
-      - confirm_topup_paid, immediately after a top-up lands, so an
-        overdue tenant is unblocked the instant they recharge rather than
-        waiting for tomorrow's sweep
+      - confirm_topup_paid, immediately after a top-up lands
+      - the admin "mark invoice paid" action
 
     Locks the Tenant row for the duration so a beat-task run and a
     top-up-triggered call can never both charge the same cycle.
 
     Returns True if nothing was due, or the due fee was successfully
     charged (tenant is/stays ACTIVE). Returns False if a fee is due but
-    the wallet still can't cover it (tenant is/stays PAID_OVERDUE).
+    the wallet still can't cover it (tenant is/stays PAID_OVERDUE), OR if
+    the tenant is CANCELLED — a cancelled account is never charged and never
+    silently reactivated by a top-up; reactivation is a deliberate admin act.
     """
     with transaction.atomic():
         locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+
+        if locked_tenant.subscription_status == Tenant.SubscriptionStatus.CANCELLED:
+            return False
 
         if (
             locked_tenant.next_platform_fee_charge_at is None
@@ -258,24 +270,37 @@ def try_charge_platform_fee(tenant) -> bool:
         locked_tenant.save(update_fields=["next_platform_fee_charge_at", "subscription_status"])
         return True
 
+
 def bill_usage(tenant, *, type, cost_usd: Decimal, description="", **refs) -> WalletTransaction:
-    
     return WalletTransaction.apply(
         tenant=tenant, type=type, amount_usd=-cost_usd, description=description, **refs,
     )
 
+
+# Characters in the GSM 03.38 basic set (1 septet each) and its extension
+# table (2 septets each). Anything outside both forces UCS-2.
+_GSM7_BASIC = set(
+    "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
+    "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà"
+)
+_GSM7_EXTENDED = set("^{}\\[~]|€")
+
+
 def count_sms_segments(text: str) -> int:
     """
-    Rough GSM-7 vs UCS-2 segment estimate — good enough for cost purposes.
-    Non-GSM-7 characters (emoji, most non-Latin scripts) force UCS-2 (70
-    chars/segment, 67 when concatenated); plain GSM-7 gets 160/153.
+    GSM-7 vs UCS-2 segment count. Extension-table characters (^ { } \\ [ ] ~ | €)
+    cost two septets each. Anything outside GSM-7 (emoji, most non-Latin
+    scripts) forces UCS-2: 70 chars/segment, 67 when concatenated. Plain
+    GSM-7 is 160/153.
     """
     text = text or ""
-    is_gsm7 = bool(re.match(r"^[\x00-\x7F£€¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!\"#$%&'()*+,\-./:;<=>?¡ÄÖÑÜ§¿äöñüà]*$", text))
     if not text:
         return 1
-    if is_gsm7:
-        return 1 if len(text) <= 160 else math.ceil(len(text) / 153)
+
+    if all(ch in _GSM7_BASIC or ch in _GSM7_EXTENDED for ch in text):
+        septets = sum(2 if ch in _GSM7_EXTENDED else 1 for ch in text)
+        return 1 if septets <= 160 else math.ceil(septets / 153)
+
     return 1 if len(text) <= 70 else math.ceil(len(text) / 67)
 
 
@@ -343,10 +368,11 @@ def bill_sms(interaction):
 
 def bill_lead_search(tenant, scrape_task, total_leads_returned: int):
     """
-    Flat $2.50 charged ONCE the search actually completes and returns at
-    least one lead (existing-in-tenant matches + master-pool pulls +
-    freshly-scraped, combined). A zero-result search costs nothing.
-    Idempotent via related_scrape_task, same pattern as bill_call.
+    Charges the flat per-search rate (PricingRate.LEAD_SEARCH_PER_QUERY) ONCE,
+    only if the search added at least one NEW lead to the tenant's list
+    (master-pool pulls + freshly scraped; leads the tenant already had don't
+    count). A zero-new-lead search costs nothing. Idempotent via
+    related_scrape_task, same pattern as bill_call.
     """
     if total_leads_returned <= 0:
         return
@@ -359,7 +385,7 @@ def bill_lead_search(tenant, scrape_task, total_leads_returned: int):
             tenant,
             type=WalletTransaction.Type.USAGE_LEAD_SEARCH,
             cost_usd=cost,
-            description=f'Prospector search: "{scrape_task.query}" — {total_leads_returned} leads',
+            description=f'Prospector search: "{scrape_task.query}" — {total_leads_returned} new leads',
             related_scrape_task=scrape_task,
         )
     except IntegrityError:
@@ -367,7 +393,8 @@ def bill_lead_search(tenant, scrape_task, total_leads_returned: int):
             "bill_lead_search: scrape_task %s already billed concurrently — skipped duplicate charge.",
             scrape_task.id,
         )
-    
+
+
 def calculate_number_purchase_cost() -> Decimal:
     """
     The PRORATED cost of purchasing a number today: full monthly rental +
@@ -397,21 +424,26 @@ def bill_number_purchase(phone_number):
     then stamps last_billed_at to the 1st of that month so the monthly
     sweep (wallet.tasks.charge_monthly_number_rentals) correctly charges
     the FULL rate starting next month, without re-billing this partial one.
+
+    The charge and the last_billed_at stamp commit together or not at all,
+    so a failed save can never leave a number charged now AND again at the
+    next sweep.
     """
     today = timezone.now().date()
     days_in_month = calendar.monthrange(today.year, today.month)[1]
     days_remaining = days_in_month - today.day + 1
     cost = calculate_number_purchase_cost()
 
-    bill_usage(
-        phone_number.tenant,
-        type=WalletTransaction.Type.USAGE_NUMBER_RENTAL,
-        cost_usd=cost,
-        description=(
-            f"Number purchase — prorated first month rental "
-            f"({days_remaining}/{days_in_month} days) — {phone_number.phone_number}"
-        ),
-        related_phone_number=phone_number,
-    )
-    phone_number.last_billed_at = today.replace(day=1)
-    phone_number.save(update_fields=["last_billed_at"])
+    with transaction.atomic():
+        bill_usage(
+            phone_number.tenant,
+            type=WalletTransaction.Type.USAGE_NUMBER_RENTAL,
+            cost_usd=cost,
+            description=(
+                f"Number purchase — prorated first month rental "
+                f"({days_remaining}/{days_in_month} days) — {phone_number.phone_number}"
+            ),
+            related_phone_number=phone_number,
+        )
+        phone_number.last_billed_at = today.replace(day=1)
+        phone_number.save(update_fields=["last_billed_at"])

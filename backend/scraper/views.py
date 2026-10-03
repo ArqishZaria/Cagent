@@ -92,7 +92,7 @@ class ScrapeSearchView(APIView):
         except PlatformFeeOverdue as exc:
             return Response(
                 {
-                    "detail": f"Your platform fee (${exc.amount_due}) is overdue — top up your wallet to keep searching.",
+                    "detail": str(exc),
                     "code": "platform_fee_overdue",
                 },
                 status=status.HTTP_402_PAYMENT_REQUIRED,

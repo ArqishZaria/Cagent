@@ -1,6 +1,5 @@
 from django.contrib import admin
 from django.urls import include, path
-from core.auth_views import LogoutView, ThrottledTokenObtainPairView, ThrottledTokenRefreshView
 
 
 from core.auth_views import (

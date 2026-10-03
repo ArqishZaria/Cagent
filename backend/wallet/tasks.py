@@ -8,13 +8,11 @@ Finances breakdown just like everything else.
 import logging
 
 from celery import shared_task
+from django.utils import timezone
+
 from core.models import PhoneNumber, Tenant
 from wallet.models import PricingRate, WalletTransaction
 from wallet.services import bill_usage, try_charge_platform_fee
-from django.utils import timezone
-from core.models import PhoneNumber
-from wallet.models import PricingRate, WalletTransaction
-from wallet.services import bill_usage
 
 logger = logging.getLogger(__name__)
 
