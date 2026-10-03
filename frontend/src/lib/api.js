@@ -73,7 +73,10 @@ api.interceptors.response.use(
           return res.data.access;
         })
         .catch((refreshErr) => {
-          clearSessionAndRedirect();
+          // Only a rejected refresh token means the session is truly over.
+          // 429s, 5xx and network errors are transient - keep the session.
+          const status = refreshErr.response?.status;
+          if (status === 400 || status === 401) clearSessionAndRedirect();
           throw refreshErr;
         })
         .finally(() => {

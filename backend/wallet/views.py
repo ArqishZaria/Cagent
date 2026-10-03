@@ -25,7 +25,25 @@ MIN_TOPUP_USD = Decimal("2.00")
 # know whether calling is possible) and the manual bank-transfer
 # instructions (ManualPaymentInfoView — not sensitive, shown on Billing).
 
+from django.core.cache import cache
+from rest_framework.permissions import AllowAny
 
+
+class PublicPricingView(APIView):
+    """GET /api/wallet/public-pricing/ - live rates for the marketing page and app UI."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        data = cache.get("public_pricing")
+        if data is None:
+            data = {
+                r.key: {"cost_usd": str(r.cost_usd), "unit": r.unit}
+                for r in PricingRate.objects.filter(is_active=True)
+            }
+            cache.set("public_pricing", data, 60)
+        return Response(data)
+    
 class TopupQuoteView(APIView):
     """GET /api/wallet/topups/quote/?amount=25 — live fee breakdown before paying."""
 

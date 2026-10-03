@@ -3,7 +3,7 @@ from django.urls import path
 from wallet.views import (
     GatewayWebhookView, ManualPaymentInfoView, PricingRateListView, TopupCreateView,
     TopupHistoryView, TopupInvoiceDownloadView, TopupQuoteView, TopupStatusView,
-    TransactionBreakdownView, TransactionListView, WalletSummaryView,
+    TransactionBreakdownView, TransactionListView, WalletSummaryView,PublicPricingView,
 )
 
 urlpatterns = [
@@ -18,4 +18,5 @@ urlpatterns = [
     path("transactions/", TransactionListView.as_view(), name="wallet-transactions"),
     path("transactions/breakdown/", TransactionBreakdownView.as_view(), name="wallet-breakdown"),
     path("pricing-rates/", PricingRateListView.as_view(), name="pricing-rates"),
+    path("public-pricing/", PublicPricingView.as_view(), name="public-pricing"),
 ]

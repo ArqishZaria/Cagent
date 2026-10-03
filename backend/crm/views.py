@@ -8,7 +8,8 @@ from core.phone_utils import normalize_to_e164
 from core.models import CustomUser, Interaction, Lead
 from core.viewsets import TenantModelViewSet
 from crm.serializers import InteractionSerializer, LeadSerializer
-
+from rest_framework.permissions import IsAuthenticated 
+from core.permissions import IsTenantAdmin
 
 class LeadViewSet(TenantModelViewSet):
     serializer_class = LeadSerializer

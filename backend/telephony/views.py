@@ -1,5 +1,4 @@
 import logging
-from decimal import Decimal, InvalidOperation
 
 import telnyx
 from django.core.cache import cache
@@ -10,10 +9,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.phone_utils import normalize_to_e164
 from core.master_lead import propagate_global_opt_out
 from core.models import Interaction, Lead, PhoneNumber
 from core.permissions import IsTenantAdmin, IsTenantMember
+from core.phone_utils import normalize_to_e164
 from core.viewsets import TenantModelViewSet
 from telephony.serializers import PhoneNumberSerializer
 from telephony.services import (
@@ -31,6 +30,7 @@ from wallet.services import (
     InsufficientBalance,
     PlatformFeeOverdue,
     bill_call,
+    bill_number_purchase,
     bill_sms,
     calculate_number_purchase_cost,
     count_sms_segments,
@@ -54,10 +54,8 @@ def _field(obj, name):
 def _from_field(obj):
     """
     Telnyx SDK objects expose the sender field as `from_` (with a trailing
-    underscore) because `from` is a reserved Python keyword and can't be used
-    as an attribute name. Plain dict payloads (e.g. in tests) still use the
-    literal key "from". Check both so this works regardless of whether
-    `obj` is an SDK object or a raw dict.
+    underscore) because `from` is a reserved Python keyword. Plain dict
+    payloads still use the literal key "from". Check both.
     """
     value = _field(obj, "from_")
     if value is None:
@@ -80,8 +78,7 @@ def _sms_to_number(payload):
 def _mark_contacted_if_needed(lead):
     """
     An inbound call or text is itself a form of contact — the lead should
-    appear directly in the CRM/Dialer chat list the moment they reach out,
-    without anyone needing to press "Contact" in the Leads List first.
+    appear in the CRM/Dialer chat list the moment they reach out.
     Idempotent: only writes if not already set.
     """
     if not lead.contacted_at:
@@ -91,20 +88,16 @@ def _mark_contacted_if_needed(lead):
 
 class WebRTCCredentialsView(APIView):
     """
-    Gated on the recurring platform fee AND wallet balance: a tenant with
-    an overdue platform fee, or a $0 wallet, simply can't get a WebRTC
-    login token, so the dialer never even connects. Per-second call cost
-    is still billed at hangup (see bill_call below) — these gates only
-    stop calling from starting at all.
+    Gated on the recurring platform fee AND wallet balance: a tenant that is
+    not ACTIVE, or has a $0 wallet, can't get a WebRTC login token, so the
+    dialer never connects.
 
     IMPORTANT: this check happens once, at token-mint time. A token stays
-    valid for the life of the WebRTC session, so this alone does NOT stop
-    a call placed later in that same session after the balance has since
-    dropped to zero (e.g. from other usage) — that is why
-    _handle_outbound_call_initiated below has its OWN independent gate,
-    enforced by Telnyx itself at the moment a call actually starts. Treat
-    this view's checks as a fast-fail UX convenience, not the security
-    boundary.
+    valid for the whole WebRTC session, so this alone does NOT stop a call
+    placed later in that session after the balance has dropped to zero —
+    _handle_outbound_call_initiated has its OWN independent gate, enforced
+    from Telnyx's signed webhook. Treat this view's checks as fast-fail UX,
+    not the security boundary.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -141,16 +134,11 @@ class CallEligibilityView(APIView):
     """
     POST /api/telephony/calls/check-balance/
 
-    The frontend hits this right before dialing (useTelnyxCall.startCall)
-    purely for UX — so the user sees a clear "top up to call" message
-    instead of a call that rings then gets silently killed. This is NOT
-    the security boundary: it is a client-side convenience check that a
-    modified or bypassed client could skip entirely by calling the Telnyx
-    SDK's newCall() directly. The real, unbypassable enforcement lives in
-    _handle_outbound_call_initiated below, which runs from Telnyx's own
-    call.initiated webhook the instant a call actually starts — the
-    client has no way to prevent that webhook from firing or from being
-    checked.
+    Called by the frontend right before dialing, purely for UX (a clear
+    "top up to call" message instead of a call that rings then gets killed).
+    NOT the security boundary: a modified client could skip it. The real
+    enforcement is _handle_outbound_call_initiated, driven by Telnyx's own
+    call.initiated webhook.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -211,10 +199,9 @@ class VoiceWebhookView(APIView):
             self._handle_inbound_call_initiated(payload, call_control_id)
         elif direction == "outgoing":
             self._handle_outbound_call_initiated(payload, call_control_id)
-        # Anything else: ignore, same as the old behavior of only acting on "incoming".
+        # Anything else: ignore.
 
     def _handle_inbound_call_initiated(self, payload, call_control_id):
-        # --- UNCHANGED from the existing _handle_call_initiated body ---
         to_number = normalize_to_e164(_field(payload, "to"))
         from_number = normalize_to_e164(_from_field(payload))
 
@@ -240,14 +227,14 @@ class VoiceWebhookView(APIView):
             require_platform_fee_current(tenant)
         except PlatformFeeOverdue:
             logger.info(
-                "Auto-declining inbound call to %s — platform fee overdue for tenant %s",
+                "Auto-declining inbound call to %s — tenant %s not active / fee overdue",
                 to_number, tenant.company_name,
             )
             Interaction.objects.create(
                 tenant=tenant, user=assigned_user, lead=lead,
                 type=Interaction.Type.CALL, direction=Interaction.Direction.INBOUND,
                 phone_number=phone_number, duration_seconds=0, missed=True,
-                notes="Auto-declined — platform fee overdue.",
+                notes="Auto-declined — platform fee overdue or account inactive.",
             )
             self._decline_call(call_control_id)
             return
@@ -283,28 +270,18 @@ class VoiceWebhookView(APIView):
 
     def _handle_outbound_call_initiated(self, payload, call_control_id):
         """
-        Fires for every call placed from our own WebRTC dialer
-        (direction="outgoing", confirmed via live webhook inspection on
-        2026-09-27). This is the ONLY place an outbound Interaction row is
-        created — the client no longer POSTs one after hangup (see
-        useTelnyxCall.js). Attribution mirrors the inbound handler exactly,
-        with from/to swapped: our own Telnyx number tells us the tenant and
-        the assigned agent; the dialed number is looked up (or created, same
-        get_or_create fallback the inbound side already uses) as a Lead.
+        Fires for every call placed from our WebRTC dialer
+        (direction="outgoing"). This is the ONLY place an outbound
+        Interaction row is created.
 
-        SECURITY: this now also carries its own platform-fee/balance gate,
-        mirroring _handle_inbound_call_initiated exactly. This is the real
-        enforcement boundary for outbound calls — WebRTCCredentialsView and
-        CallEligibilityView are both client-side pre-checks a modified
-        client could skip entirely by calling the Telnyx SDK's newCall()
-        directly once it holds a valid token; this handler cannot be
-        skipped, because it runs from Telnyx's own signed call.initiated
-        webhook the instant the call actually starts, regardless of what
-        checks (if any) the client performed first. If the tenant is
-        over-drawn or fee-overdue at that exact moment, the call is hung up
-        immediately via the Telnyx API — before it ever connects to the
-        lead — and logged as missed, the same way an auto-declined inbound
-        call is logged.
+        SECURITY: carries its own platform-fee/balance gate. This is the real
+        enforcement boundary for outbound calls — the REST pre-checks can be
+        skipped by a modified client, this webhook cannot. If the tenant is
+        over-drawn or inactive at that moment the call is hung up before it
+        connects and logged as missed.
+
+        KNOWN GAP (fixed in the next batch, C2): the tenant is derived from
+        the caller-ID number, which a modified client can spoof.
         """
         cache_key = f"telnyx:call_interaction:{call_control_id}"
         if cache.get(cache_key):
@@ -335,15 +312,14 @@ class VoiceWebhookView(APIView):
             require_platform_fee_current(tenant)
         except PlatformFeeOverdue:
             logger.info(
-                "Killing outbound call from %s — platform fee overdue for tenant %s "
-                "(client-side pre-check was bypassed or stale)",
+                "Killing outbound call from %s — tenant %s not active / fee overdue",
                 from_number, tenant.company_name,
             )
             Interaction.objects.create(
                 tenant=tenant, user=assigned_user, lead=lead,
                 type=Interaction.Type.CALL, direction=Interaction.Direction.OUTBOUND,
                 phone_number=phone_number, duration_seconds=0, missed=True,
-                notes="Auto-terminated — platform fee overdue.",
+                notes="Auto-terminated — platform fee overdue or account inactive.",
             )
             self._decline_call(call_control_id)
             return
@@ -353,8 +329,7 @@ class VoiceWebhookView(APIView):
             require_balance(tenant, per_minute)
         except InsufficientBalance:
             logger.info(
-                "Killing outbound call from %s — insufficient balance for tenant %s "
-                "(client-side pre-check was bypassed or stale)",
+                "Killing outbound call from %s — insufficient balance for tenant %s",
                 from_number, tenant.company_name,
             )
             Interaction.objects.create(
@@ -389,22 +364,21 @@ class VoiceWebhookView(APIView):
 
     def _handle_call_hangup(self, payload, call_control_id):
         """
-        Confirmed (live webhook inspection, 2026-09-27): Telnyx's
-        call.hangup payload for this account carries NO duration field at
-        all — not even a zero — on either a cancelled or a real 5.5-minute
-        answered call. Billing therefore happens entirely in
-        _handle_call_cost below, using call.cost's own billed_duration_secs.
-        Left as an explicit no-op branch (not removed) in case hangup_cause
-        is needed for something later — but it does nothing today.
+        Telnyx's call.hangup payload for this account carries no duration
+        field, so billing happens entirely in _handle_call_cost using
+        call.cost's billed_duration_secs. Intentionally a no-op.
         """
         return
 
     def _handle_call_cost(self, payload, call_control_id):
         """
-        call.cost is Telnyx's own final, authoritative billing event for a
-        call leg — confirmed to carry billed_duration_secs at the top level
-        for both directions, arriving ~200ms after call.hangup. This is now
-        the ONLY code path in the entire system that ever calls bill_call().
+        call.cost is Telnyx's final, authoritative billing event for a call
+        leg and carries billed_duration_secs. This is the ONLY code path that
+        calls bill_call().
+
+        KNOWN GAP (fixed in the next batch, C3): the call_control_id ->
+        interaction mapping lives in Redis with a 1-hour TTL, so a call
+        longer than an hour, or a Redis flush, would go unbilled.
         """
         cache_key = f"telnyx:call_interaction:{call_control_id}"
         interaction_id = cache.get(cache_key)
@@ -420,11 +394,12 @@ class VoiceWebhookView(APIView):
             interaction = Interaction.objects.select_related("tenant", "phone_number").get(id=interaction_id)
             bill_call(interaction)
 
+
 class SMSSendView(APIView):
     """
     Checks the platform fee and wallet balance BEFORE sending (so we never
-    pay Telnyx for a message we then can't bill for), then bills the
-    actual segment count after a successful send.
+    pay Telnyx for a message we then can't bill for), then bills the actual
+    segment count after a successful send.
     """
 
     permission_classes = [IsAuthenticated, IsTenantMember]
@@ -542,11 +517,10 @@ class SMSWebhookView(APIView):
             phone_number=from_number,
             defaults={"status": Lead.Status.NEW, "owner": assigned_user},
         )
-        # An inbound text is itself contact — surface this lead directly in
-        # the CRM/Dialer chat list immediately, without requiring anyone to
-        # press "Contact" in the Leads List first.
         _mark_contacted_if_needed(lead)
 
+        # KNOWN GAP (fixed in the next batch, C5): substring matching opts
+        # people out of messages like "please don't cancel my order".
         if any(keyword in text.upper() for keyword in STOP_KEYWORDS):
             lead.do_not_contact = True
             lead.save(update_fields=["do_not_contact"])
@@ -561,11 +535,10 @@ class SMSWebhookView(APIView):
             message_body=text,
             phone_number=phone_number,
         )
-        # Inbound SMS is billed too — Telnyx charges for receiving, not just
-        # sending. No balance/platform-fee pre-check here since we can't
-        # refuse to *receive* a text; if this dips a tenant below $0, the
-        # low-balance notification (fired from bill_usage ->
-        # WalletTransaction.apply) still goes out.
+        # Inbound SMS is billed too (Telnyx charges for receiving). No
+        # balance pre-check: we can't refuse to receive a text.
+        # KNOWN GAP (fixed in the next batch, C3): no idempotency on
+        # Telnyx retries.
         bill_sms(interaction)
 
 
@@ -587,23 +560,27 @@ class NumberSearchView(APIView):
 
 
 class NumberViewSet(TenantModelViewSet):
+    """
+    Read + assign only. Numbers are CREATED exclusively by NumberPurchaseView
+    (which buys them from Telnyx and bills the wallet) and REMOVED exclusively
+    by NumberDeactivateView (which releases them at Telnyx). Allowing
+    POST/PUT/DELETE here would let an admin create phantom numbers, or drop a
+    number locally while Telnyx keeps billing you for it. The serializer also
+    restricts PATCH to `assigned_user`.
+    """
+
     serializer_class = PhoneNumberSerializer
     queryset = PhoneNumber.objects.all().order_by("-purchased_at")
-    # Scoped so an AGENT's GET /api/telephony/numbers/ only returns numbers
-    # assigned to them — previously None, which per TenantModelViewSet's own
-    # docstring meant AGENT fell back to full-tenant visibility, exposing
-    # every teammate's number (and Telnyx order IDs) to any agent who hit
-    # the endpoint directly rather than going through ProfilePage's
-    # client-side filter. ADMIN visibility (full tenant list) is unaffected
-    # — this field only applies to the AGENT branch in
-    # TenantModelViewSet.get_queryset().
+    # An AGENT only sees numbers assigned to them; ADMIN sees the whole tenant.
     agent_owner_field = "assigned_user"
+    http_method_names = ["get", "patch", "head", "options"]
 
     def get_permissions(self):
-        if self.request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        if self.request.method == "PATCH":
             return [IsAuthenticated(), IsTenantAdmin()]
         return [IsAuthenticated(), IsTenantMember()]
-    
+
+
 class NumberPurchaseView(APIView):
     permission_classes = [IsAuthenticated, IsTenantAdmin]
 
@@ -626,7 +603,8 @@ class NumberPurchaseView(APIView):
         prorated_cost = calculate_number_purchase_cost()
         try:
             require_balance(request.user.tenant, prorated_cost)
-        except InsufficientBalance as exc:            return Response(
+        except InsufficientBalance as exc:
+            return Response(
                 {"detail": f"Insufficient wallet balance to buy a number (need ${exc.required}, have ${exc.available}).",
                  "code": "insufficient_balance"},
                 status=status.HTTP_402_PAYMENT_REQUIRED,
@@ -638,37 +616,27 @@ class NumberPurchaseView(APIView):
             logger.exception("Number purchase failed")
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-        create_kwargs = {}
-        raw_monthly_cost = request.data.get("monthly_cost")
-        if raw_monthly_cost:
-            try:
-                create_kwargs["monthly_cost"] = Decimal(str(raw_monthly_cost))
-            except InvalidOperation:
-                return Response({"detail": "monthly_cost must be a valid decimal."}, status=status.HTTP_400_BAD_REQUEST)
-
+        # monthly_cost is deliberately NOT taken from the request body — the
+        # client must never set what a number costs. The model default is used.
         number = PhoneNumber.objects.create(
             tenant=request.user.tenant,
             phone_number=phone_number,
             telnyx_order_id=order.get("id", ""),
             telnyx_phone_number_id=order.get("_phone_number_resource_id", ""),
             is_active=True,
-            **create_kwargs,
         )
-        
 
-        from wallet.services import bill_number_purchase
         bill_number_purchase(number)
 
         return Response(PhoneNumberSerializer(number).data, status=status.HTTP_201_CREATED)
-    
+
+
 class NumberDeactivateView(APIView):
     """
     POST /api/telephony/numbers/<id>/deactivate/  (ADMIN only)
 
-    Releases the number from Telnyx (removing it from the Telnyx portal
-    entirely) and marks it inactive locally. Once released, this exact
-    number cannot be re-enabled — buying it back would mean a fresh
-    purchase of whatever's available, if anything.
+    Releases the number from Telnyx and marks it inactive locally. Once
+    released, this exact number cannot be re-enabled.
     """
 
     permission_classes = [IsAuthenticated, IsTenantAdmin]

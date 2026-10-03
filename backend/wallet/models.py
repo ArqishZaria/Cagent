@@ -251,3 +251,22 @@ class WalletTransaction(models.Model):
                 name="unique_wallettransaction_per_scrape_task",
             ),
         ]
+        
+        
+class WalletAdjustment(models.Model):
+    """
+    Audited manual correction (+ credit / - debit) entered by the platform
+    owner. Saving a NEW row applies it through WalletTransaction.apply(), so
+    balance and ledger never drift. Locked after save (see admin).
+    """
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="wallet_adjustments")
+    amount_usd = models.DecimalField(max_digits=10, decimal_places=2, help_text="Positive = credit, negative = debit.")
+    reason = models.CharField(max_length=255)
+    processed_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.tenant.company_name} {self.amount_usd:+} ({self.reason})"

@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { Mic, MicOff, Phone, PhoneOff } from "lucide-react";
 import { Audio } from "@telnyx/react-client";
 import SignalBars from "./SignalBars";
 import useTelnyxCall from "../hooks/useTelnyxCall";
+import { setCallActive } from "../lib/callActivity";
 
 export default function CallWidget() {
   const {
@@ -18,6 +20,13 @@ export default function CallWidget() {
     declineWaiting,
     toggleMute,
   } = useTelnyxCall();
+
+  // Tells the idle-logout timer whether a call is in progress. This hook must
+  // stay ABOVE the early return below (rules of hooks).
+  useEffect(() => {
+    setCallActive(Boolean(activeCall || waitingCall));
+    return () => setCallActive(false);
+  }, [activeCall, waitingCall]);
 
   if (!activeCall && !waitingCall) return null;
 

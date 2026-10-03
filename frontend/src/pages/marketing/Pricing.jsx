@@ -4,15 +4,22 @@ import PublicNav from "../../components/marketing/PublicNav";
 import PublicFooter from "../../components/marketing/PublicFooter";
 import Reveal from "../../components/marketing/Reveal";
 
-const USAGE_RATES = [
-  { icon: Phone, label: "Phone number", price: "$1.50", unit: "/ month" },
-  { icon: Phone, label: "Outbound calls", price: "$0.014", unit: "/ min" },
-  { icon: Phone, label: "Inbound calls", price: "$0.009", unit: "/ min" },
-  { icon: MessageSquareText, label: "Outbound SMS", price: "$0.016", unit: "/ segment" },
-  { icon: MessageSquareText, label: "Inbound SMS", price: "$0.008", unit: "/ segment" },
-  { icon: Sparkles, label: "Lead search", price: "$2.50", unit: "/ search · up to 25 leads" },
-];
+import { usePricing } from "../../lib/pricing";
 
+const fmt = (n, d = 2) => (n == null ? "—" : `$${n.toFixed(d)}`);
+
+// inside PricingPage():
+const { get } = usePricing();
+const platform = get("platform_fee_monthly");
+const numberMonthly = (get("number_monthly_rental") ?? 0) + (get("number_sms_capability_fee") ?? 0);
+const USAGE_RATES = [
+    { icon: Phone, label: "Phone number (voice + SMS)", price: fmt(numberMonthly || null), unit: "/ month" },
+    { icon: Phone, label: "Outbound calls", price: fmt(get("call_outbound_per_minute"), 4), unit: "/ min" },
+    { icon: Phone, label: "Inbound calls", price: fmt(get("call_inbound_per_minute"), 4), unit: "/ min" },
+    { icon: MessageSquareText, label: "Outbound SMS", price: fmt(get("sms_outbound_per_segment"), 4), unit: "/ segment" },
+    { icon: MessageSquareText, label: "Inbound SMS", price: fmt(get("sms_inbound_per_segment"), 4), unit: "/ segment" },
+    { icon: Sparkles, label: "Lead search", price: fmt(get("lead_search_per_query")), unit: "/ search · up to 25 leads" },
+  ];
 const INCLUDED = [
   "Unlimited agent seats",
   "Browser-based dialer & CRM",

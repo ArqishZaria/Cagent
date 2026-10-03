@@ -227,7 +227,8 @@ CACHES = {
     }
 }
 RATELIMIT_USE_CACHE = "default"
-
+# Behind nginx, REMOTE_ADDR is always 127.0.0.1. Key limits on the header nginx sets.
+RATELIMIT_IP_META_KEY = "HTTP_X_REAL_IP"
 # ------------------------------------------------------------------------------------
 # Third-party API keys (Telnyx / Gemini)
 # ------------------------------------------------------------------------------------

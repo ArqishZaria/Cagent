@@ -10,8 +10,8 @@ class PhoneNumberSerializer(serializers.ModelSerializer):
             "id", "phone_number", "assigned_user", "telnyx_order_id",
             "is_active", "monthly_cost", "purchased_at",
         )
-        read_only_fields = ("id", "telnyx_order_id", "monthly_cost", "purchased_at")
-
+        read_only_fields = ("id", "phone_number", "is_active", "telnyx_order_id", "monthly_cost", "purchased_at")
+        
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # assigned_user must be scoped to the requesting user's tenant —

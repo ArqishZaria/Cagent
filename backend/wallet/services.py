@@ -204,16 +204,12 @@ def require_balance(tenant, cost_usd: Decimal):
 
 def require_platform_fee_current(tenant):
     """
-    Raises PlatformFeeOverdue if this tenant is currently locked out of
-    billable actions (calls, SMS, lead search) for an unpaid recurring
-    platform fee. Deliberately narrow: read-only areas of the app (leads,
-    call logs, settings, billing itself) are never gated by this — only
-    the billable-action call sites check it.
+    Blocks billable actions (calls, SMS, search, number purchase) unless the
+    tenant is ACTIVE. PAID_OVERDUE = unpaid recurring fee; CANCELLED = ended.
     """
-    if tenant.subscription_status == Tenant.SubscriptionStatus.PAID_OVERDUE:
+    if tenant.subscription_status != Tenant.SubscriptionStatus.ACTIVE:
         cost = PricingRate.get_cost(PricingRate.Key.PLATFORM_FEE_MONTHLY)
         raise PlatformFeeOverdue(cost)
-
 
 def try_charge_platform_fee(tenant) -> bool:
     """

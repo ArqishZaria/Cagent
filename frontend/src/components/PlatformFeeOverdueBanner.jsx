@@ -14,10 +14,12 @@ export default function PlatformFeeOverdueBanner() {
   return (
     <div className="bg-alert text-white px-4 py-2.5 flex items-center justify-center gap-3 text-sm">
       <AlertTriangle size={15} className="shrink-0" />
+      
       <span>
-        Your ${wallet.platform_fee_amount_usd || "15.00"} monthly platform fee couldn't be charged — calling,
-        texting, and lead search are paused until you top up.
-      </span>
+        {wallet.platform_fee_amount_usd
+          ? `Your $${wallet.platform_fee_amount_usd} monthly platform fee`
+          : "Your monthly platform fee"}{" "}
+        couldn't be charged — calling, texting, and lead search are paused until you top up.      </span>
       <Link to="/app/finance/upload" className="font-semibold underline shrink-0">
         Top up now
       </Link>

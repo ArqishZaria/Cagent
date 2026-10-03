@@ -11,7 +11,7 @@ const FAQS = [
     items: [
       { q: "What is cagent?", a: "cagent puts your phone system, CRM, and AI lead generation in one place. Calls and texts log automatically to each lead's profile, and the Prospector finds new leads for you." },
       { q: "How do I get a phone number?", a: "An Admin buys a number under Company Settings → Phone numbers, searching by area code. Once purchased it can be assigned to any teammate." },
-      { q: "Why does the portal sign me out?", a: "For security, you're automatically signed out after 5 minutes of no activity anywhere in the portal." },
+      { q: "Why does the portal sign me out?", a: "For security, you're automatically signed out after 15 minutes of no activity anywhere in the portal." },
     ],
   },
   {
